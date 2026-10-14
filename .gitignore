@@ -1,0 +1,38 @@
+# Build artifacts
+*.o
+*.obj
+*.exe
+*.out
+*.a
+*.so
+*.dylib
+
+# Project build output
+/build/
+/gedcom_parser
+/test_runner
+/node_modules/
+/playwright-report/
+/test-results/
+
+# Core dumps / crash traces
+core
+core.*
+*.core
+
+# Editor / OS files
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Temporary test files
+/tmp/
+*.tmp
+*.log
+
+tmp_false_positive.ged
+tmp_source_citation.ged
+tmp_parser_input.ged
+tmp_empty_gedcom.ged
+tmp_repository_records.ged
+tmp_html_report.html

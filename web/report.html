@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Explorateur GEDCOM</title>
+  <link rel="stylesheet" href="report.css">
+  <script id="report-data" type="application/json">{{GEDCOM_REPORT_DATA}}</script>
+  <script src="report.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand-mark" aria-hidden="true">GED</div>
+      <div class="header-copy">
+        <p class="eyebrow">ARCHIVES / GEDCOM</p>
+        <h1>Explorateur de sources</h1>
+      </div>
+      <p id="report-summary" class="report-summary" aria-live="polite"></p>
+    </header>
+    <div class="workspace">
+      <aside class="source-sidebar" aria-label="Navigation des sources">
+        <div class="sidebar-heading">
+          <h2>Sources</h2>
+          <span id="source-count"></span>
+        </div>
+        <label class="search-label" for="source-filter">Filtrer la liste</label>
+        <input id="source-filter" type="search" placeholder="Référence ou texte" autocomplete="off">
+        <div class="report-refresh-controls">
+          <label class="keep-state-toggle" for="keep-page-state">
+            <input id="keep-page-state" type="checkbox" checked>
+            <span>Rester sur la page actuelle</span>
+          </label>
+          <button id="refresh-report" type="button" class="refresh-button">Rafraîchir</button>
+        </div>
+        <nav id="source-navigation" class="source-navigation" aria-label="Entités source"></nav>
+      </aside>
+      <main class="report-main">
+        <div class="page-controls" aria-label="Navigation des sources">
+          <div class="section-scroll-options" role="radiogroup" aria-label="Défilement automatique">
+            <label class="section-scroll-toggle" for="scroll-none">
+              <input id="scroll-none" type="radio" name="section-scroll-target" value="" checked>
+              <span>Aucun</span>
+            </label>
+            <label class="section-scroll-toggle" for="scroll-repositories">
+              <input id="scroll-repositories" type="radio" name="section-scroll-target" value="repository-section">
+              <span>Dépôts associés</span>
+            </label>
+            <label class="section-scroll-toggle" for="scroll-citations">
+              <input id="scroll-citations" type="radio" name="section-scroll-target" value="citation-section">
+              <span>Citations vers cette source</span>
+            </label>
+          </div>
+          <button id="first-source" type="button" aria-label="Première source" title="Première source">|←</button>
+          <button id="jump-back" type="button" aria-label="Page précédente de 10 sources" title="Page précédente">«</button>
+          <button id="previous-source" type="button" aria-label="Source précédente" title="Source précédente">←</button>
+          <span id="page-position" aria-live="polite"></span>
+          <button id="next-source" type="button" aria-label="Source suivante" title="Source suivante">→</button>
+          <button id="jump-forward" type="button" aria-label="Page suivante de 10 sources" title="Page suivante">»</button>
+          <button id="last-source" type="button" aria-label="Dernière source" title="Dernière source">→|</button>
+          <label class="page-step-label" for="page-step">Pas
+            <select id="page-step" aria-label="Nombre de sources par saut">
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="30">30</option>
+              <option value="40">40</option>
+              <option value="50">50</option>
+            </select>
+          </label>
+        </div>
+        <section id="source-page" aria-live="polite"></section>
+        <section id="unmatched-citations"></section>
+      </main>
+    </div>
+    <footer class="app-footer">Rapport local · Extraits GEDCOM conservés en texte brut</footer>
+  </div>
+</body>
+</html>
