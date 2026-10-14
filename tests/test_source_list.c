@@ -4,6 +4,16 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Helpers de test */
+
+/* Exécute un test et rapporte son résultat sous son nom. */
+static int run_test(const char *test_name, int (*test_function)(void)) {
+    int passed = test_function();
+
+    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
+    return passed;
+}
+
 /* Vérifie que l'initialisation crée une liste vide. */
 static int test_initial_state(void) {
     /* Given */
@@ -25,8 +35,8 @@ static int test_initial_state(void) {
     return 0;
 }
 
-/* Vérifie que les arguments invalides sont rejetés. */
-static int test_rejects_invalid_arguments(void) {
+/* Vérifie qu'une liste NULL est rejetée à l'ajout. */
+static int test_rejects_null_list(void) {
     /* Given */
     const int expected_add_result = 0;
     const SourceInput valid_input = {
@@ -35,29 +45,42 @@ static int test_rejects_invalid_arguments(void) {
         .kind = "entity",
         .context = "entity",
     };
+
+    /* When */
+    int add_result = source_list_add(NULL, &valid_input);
+
+    /* Then */
+    if (add_result == expected_add_result) {
+        printf("[PASS] Rejet d'une liste NULL\n");
+        return 1;
+    }
+    printf("[FAIL] Rejet d'une liste NULL\n");
+    return 0;
+}
+
+/* Vérifie qu'une entrée sans description est rejetée. */
+static int test_rejects_missing_description(void) {
+    /* Given */
+    const int expected_add_result = 0;
     const SourceInput invalid_input = {
         .reference = "@S0@",
         .kind = "entity",
         .context = "entity",
     };
     SourceList sources;
-    int null_list_result;
-    int invalid_input_result;
+    int add_result;
 
     /* When */
     init_source_list(&sources);
-    null_list_result = source_list_add(NULL, &valid_input);
-    invalid_input_result = source_list_add(&sources, &invalid_input);
+    add_result = source_list_add(&sources, &invalid_input);
 
     /* Then */
-    if (null_list_result == expected_add_result &&
-        invalid_input_result == expected_add_result) {
-        free_source_list(&sources);
-        printf("[PASS] Rejet des arguments invalides\n");
+    free_source_list(&sources);
+    if (add_result == expected_add_result) {
+        printf("[PASS] Rejet d'une description manquante\n");
         return 1;
     }
-    printf("[FAIL] Rejet des arguments invalides\n");
-    free_source_list(&sources);
+    printf("[FAIL] Rejet d'une description manquante\n");
     return 0;
 }
 
@@ -174,14 +197,18 @@ static int test_free_resets_list(void) {
 
 /* Exécute les tests unitaires de SourceList. */
 int main(void) {
-    const int total_tests = 5;
+    const int total_tests = 6;
     int passed_tests = 0;
 
-    passed_tests += test_initial_state();
-    passed_tests += test_rejects_invalid_arguments();
-    passed_tests += test_grows_and_stores_values();
-    passed_tests += test_cleans_up_after_allocation_failure();
-    passed_tests += test_free_resets_list();
+    passed_tests += run_test("test_initial_state", test_initial_state);
+    passed_tests += run_test("test_rejects_null_list", test_rejects_null_list);
+    passed_tests += run_test("test_rejects_missing_description",
+                             test_rejects_missing_description);
+    passed_tests +=
+        run_test("test_grows_and_stores_values", test_grows_and_stores_values);
+    passed_tests += run_test("test_cleans_up_after_allocation_failure",
+                             test_cleans_up_after_allocation_failure);
+    passed_tests += run_test("test_free_resets_list", test_free_resets_list);
 
     printf("Résultat source_list: %d/%d réussis.\n", passed_tests, total_tests);
     return passed_tests == total_tests ? 0 : 1;

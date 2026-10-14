@@ -3,6 +3,16 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Helpers de test */
+
+/* Exécute un test et rapporte son résultat sous son nom. */
+static int run_test(const char *test_name, int (*test_function)(void)) {
+    int passed = test_function();
+
+    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
+    return passed;
+}
+
 /* Vérifie l'état initial d'une liste de dépôts. */
 static int test_initial_state(void) {
     /* Given */
@@ -25,70 +35,118 @@ static int test_initial_state(void) {
     return 0;
 }
 
-/* Vérifie l'ajout et la mise à jour des dépôts et de leurs liens. */
-static int test_add_and_update(void) {
+/* Vérifie l'ajout d'un dépôt avec sa référence et son nom. */
+static int test_add_repository(void) {
     /* Given */
-    const size_t expected_repository_count = 2U;
+    const size_t expected_repository_count = 1U;
+    const char *expected_reference = "@R1@";
+    const char *expected_name = "Archives";
+    RepositoryList repositories;
+    int passed;
+
+    /* When */
+    init_repository_list(&repositories);
+    passed =
+        repository_list_add(&repositories, expected_reference, expected_name);
+
+    /* Then */
+    passed = passed && repositories.count == expected_repository_count &&
+             strcmp(repositories.repositories[0].reference,
+                    expected_reference) == 0 &&
+             strcmp(repositories.repositories[0].name, expected_name) == 0;
+    free_repository_list(&repositories);
+    return passed;
+}
+
+/* Vérifie la mise à jour du nom d'un dépôt existant. */
+static int test_updates_repository_name(void) {
+    /* Given */
+    const int expected_update_result = 1;
+    const char *expected_name = "Archives";
+    RepositoryList repositories;
+    int update_result;
+
+    /* When */
+    init_repository_list(&repositories);
+    repository_list_add(&repositories, "@R2@", "Nom temporaire");
+    update_result =
+        repository_list_set_name(&repositories, "@R2@", expected_name);
+
+    /* Then */
+    update_result =
+        update_result == expected_update_result &&
+        strcmp(repositories.repositories[0].name, expected_name) == 0;
+    free_repository_list(&repositories);
+    return update_result;
+}
+
+/* Vérifie l'ajout d'un lien entre une source et un dépôt. */
+static int test_adds_repository_link(void) {
+    /* Given */
     const size_t expected_link_count = 1U;
-    const char *expected_first_reference = "@R1@";
-    const char *expected_first_name = "@R1@";
-    const char *expected_second_name = "Archives";
     const char *expected_source_reference = "@S1@";
     const char *expected_repository_reference = "@R1@";
     const char *expected_context = "@S1@ SOUR / REPO";
     RepositoryList repositories;
     int added;
-    int updated;
-    int passed;
 
     /* When */
     init_repository_list(&repositories);
-    added = repository_list_add(&repositories, "@R1@", "@R1@") &&
-            repository_list_add(&repositories, "@R2@", "Nom temporaire") &&
-            repository_list_add_link(&repositories, "@S1@", "@R1@",
-                                     "@S1@ SOUR / REPO");
-    updated = repository_list_set_name(&repositories, "@R2@", "Archives");
+    repository_list_add(&repositories, "@R1@", "Archives");
+    added = repository_list_add_link(&repositories, expected_source_reference,
+                                     expected_repository_reference,
+                                     expected_context);
 
     /* Then */
-    passed =
-        added && updated && repositories.count == expected_repository_count &&
-        strcmp(repositories.repositories[0].reference,
-               expected_first_reference) == 0 &&
-        strcmp(repositories.repositories[0].name, expected_first_name) == 0 &&
-        strcmp(repositories.repositories[1].name, expected_second_name) == 0 &&
-        repositories.link_count == expected_link_count &&
-        strcmp(repositories.links[0].source_reference,
-               expected_source_reference) == 0 &&
-        strcmp(repositories.links[0].repository_reference,
-               expected_repository_reference) == 0 &&
-        strcmp(repositories.links[0].context, expected_context) == 0;
+    added = added && repositories.link_count == expected_link_count &&
+            strcmp(repositories.links[0].source_reference,
+                   expected_source_reference) == 0 &&
+            strcmp(repositories.links[0].repository_reference,
+                   expected_repository_reference) == 0 &&
+            strcmp(repositories.links[0].context, expected_context) == 0;
     free_repository_list(&repositories);
-    return passed;
+    return added;
 }
 
-/* Vérifie que les arguments invalides sont rejetés. */
-static int test_rejects_invalid_arguments(void) {
+/* Vérifie qu'une référence de dépôt NULL est rejetée. */
+static int test_rejects_null_reference(void) {
     /* Given */
-    const int expected_rejected_result = 0;
+    const int expected_add_result = 0;
     RepositoryList repositories;
-    int invalid_add_rejected;
-    int unknown_name_rejected;
+    int add_result;
 
     /* When */
     init_repository_list(&repositories);
-    invalid_add_rejected = repository_list_add(&repositories, NULL, "Nom") ==
-                           expected_rejected_result;
-    unknown_name_rejected =
-        repository_list_set_name(&repositories, "@R3@", "Inconnu") ==
-        expected_rejected_result;
-    free_repository_list(&repositories);
+    add_result = repository_list_add(&repositories, NULL, "Nom");
 
     /* Then */
-    if (invalid_add_rejected && unknown_name_rejected) {
-        printf("[PASS] Rejet des arguments invalides\n");
+    free_repository_list(&repositories);
+    if (add_result == expected_add_result) {
+        printf("[PASS] Rejet d'une référence NULL\n");
         return 1;
     }
-    printf("[FAIL] Rejet des arguments invalides\n");
+    printf("[FAIL] Rejet d'une référence NULL\n");
+    return 0;
+}
+
+/* Vérifie que le nom d'un dépôt inconnu ne peut pas être mis à jour. */
+static int test_rejects_unknown_repository_name(void) {
+    /* Given */
+    const int expected_update_result = 0;
+    RepositoryList repositories;
+    int update_result;
+
+    /* When */
+    init_repository_list(&repositories);
+    update_result = repository_list_set_name(&repositories, "@R3@", "Inconnu");
+
+    /* Then */
+    free_repository_list(&repositories);
+    if (update_result == expected_update_result) {
+        printf("[PASS] Rejet de la mise à jour d'un dépôt inconnu\n");
+        return 1;
+    }
+    printf("[FAIL] Rejet de la mise à jour d'un dépôt inconnu\n");
     return 0;
 }
 
@@ -121,13 +179,19 @@ static int test_free_resets_list(void) {
 
 /* Exécute les tests unitaires de RepositoryList. */
 int main(void) {
-    const int total = 4;
+    const int total = 7;
     int passed = 0;
 
-    passed += test_initial_state();
-    passed += test_add_and_update();
-    passed += test_rejects_invalid_arguments();
-    passed += test_free_resets_list();
+    passed += run_test("test_initial_state", test_initial_state);
+    passed += run_test("test_add_repository", test_add_repository);
+    passed +=
+        run_test("test_updates_repository_name", test_updates_repository_name);
+    passed += run_test("test_adds_repository_link", test_adds_repository_link);
+    passed +=
+        run_test("test_rejects_null_reference", test_rejects_null_reference);
+    passed += run_test("test_rejects_unknown_repository_name",
+                       test_rejects_unknown_repository_name);
+    passed += run_test("test_free_resets_list", test_free_resets_list);
 
     if (passed) {
         printf("[PASS] Initialisation, ajout, nom et libération de "

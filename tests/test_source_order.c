@@ -7,6 +7,16 @@ typedef struct {
     const char *right;
 } ReferencePair;
 
+/* Helpers de test */
+
+/* Exécute un test et rapporte son résultat sous son nom. */
+static int run_test(const char *test_name, int (*test_function)(void)) {
+    int passed = test_function();
+
+    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
+    return passed;
+}
+
 /* Vérifie et affiche l'ordre attendu d'une paire de références. */
 static int expect_before(ReferencePair references, const char *label) {
     const char *left_text =
@@ -162,14 +172,16 @@ int main(void) {
     const int total = 8;
     int passed = 0;
 
-    passed += test_numeric_order();
-    passed += test_letter_order();
-    passed += test_leading_zero_order();
-    passed += test_large_suffix_order();
-    passed += test_null_order();
-    passed += test_missing_suffix_order();
-    passed += test_malformed_reference_order();
-    passed += test_case_insensitive_order();
+    passed += run_test("test_numeric_order", test_numeric_order);
+    passed += run_test("test_letter_order", test_letter_order);
+    passed += run_test("test_leading_zero_order", test_leading_zero_order);
+    passed += run_test("test_large_suffix_order", test_large_suffix_order);
+    passed += run_test("test_null_order", test_null_order);
+    passed += run_test("test_missing_suffix_order", test_missing_suffix_order);
+    passed += run_test("test_malformed_reference_order",
+                       test_malformed_reference_order);
+    passed +=
+        run_test("test_case_insensitive_order", test_case_insensitive_order);
 
     printf("Résultat source_order: %d/%d réussis.\n", passed, total);
     return (passed == total) ? 0 : 1;

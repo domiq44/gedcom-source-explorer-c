@@ -6,7 +6,32 @@
 
 typedef enum { TEST_SKIPPED = -1, TEST_FAILED = 0, TEST_PASSED = 1 } TestResult;
 
+typedef struct {
+    const char *filename;
+    const char *invalid_line;
+} InvalidGedcomLevelCase;
+
 // --- Fonctions utilitaires de test ---
+
+/* Exécute un test booléen et rapporte son résultat sous son nom. */
+static int run_test(const char *test_name, int (*test_function)(void)) {
+    int passed = test_function();
+
+    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
+    return passed;
+}
+
+/* Exécute un test qui peut être ignoré selon la plateforme. */
+static TestResult run_result_test(const char *test_name,
+                                  TestResult (*test_function)(void)) {
+    TestResult result = test_function();
+
+    printf("[%s] %s\n",
+           result == TEST_PASSED ? "PASS"
+                                 : (result == TEST_SKIPPED ? "SKIP" : "FAIL"),
+           test_name);
+    return result;
+}
 
 /**
  * @brief Teste l'égalité de deux chaînes de caractères.
@@ -39,7 +64,6 @@ static int assert_string_equal(const char *actual, const char *expected,
  */
 static int run_parser_test(const char *filename, int expected_count) {
     /* Given */
-    static const char *expected_values[] = {"@S1@", "@S2@", "@S3@"};
     const int expected_parse_result = 0;
     SourceList sources;
     RepositoryList repositories;
@@ -53,6 +77,7 @@ static int run_parser_test(const char *filename, int expected_count) {
     /* Then */
     if (result == expected_parse_result) {
         if ((int)sources.count == expected_count) {
+            static const char *expected_values[] = {"@S1@", "@S2@", "@S3@"};
             int values_ok = 1;
             size_t i;
 
@@ -83,6 +108,94 @@ static int run_parser_test(const char *filename, int expected_count) {
     free_source_list(&sources);
     free_repository_list(&repositories);
     return passed;
+}
+
+/* Prépare un fichier à niveau invalide et vérifie son diagnostic. */
+static int rejects_invalid_gedcom_level(
+    InvalidGedcomLevelCase test_case, int expected_parse_failure,
+    GedcomParseErrorCode expected_error_code, size_t expected_error_line) {
+    FILE *file = fopen(test_case.filename, "w");
+    SourceList sources;
+    RepositoryList repositories;
+    GedcomParseError error;
+    int write_status;
+    int close_status;
+    int parse_status;
+    int rejected;
+
+    if (file == NULL) {
+        return 0;
+    }
+    write_status = fputs("0 @I1@ INDI\n", file);
+    if (write_status != EOF && fputs(test_case.invalid_line, file) == EOF) {
+        write_status = EOF;
+    }
+    close_status = fclose(file);
+    if (write_status == EOF || close_status != 0) {
+        remove(test_case.filename);
+        return 0;
+    }
+
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    parse_status = parse_gedcom_with_error(test_case.filename, &sources,
+                                           &repositories, &error);
+    rejected = (parse_status != 0) == expected_parse_failure &&
+               error.code == expected_error_code &&
+               error.line_number == expected_error_line;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    remove(test_case.filename);
+    return rejected;
+}
+
+static const char repository_records_fixture[] =
+    "0 @S1@ SOUR\n"
+    "1 TITL Source principale\n"
+    "2 CONT Première partie du titre\n"
+    "1 NOTE Note détaillée sur la source\n"
+    "2 CONT Informations supplémentaires sur le document\n"
+    "1 REPO @R1@\n"
+    "2 CALN Étagère 4\n"
+    "3 MEDI Livre\n"
+    "1 REPO @R2@\n"
+    "0 @I1@ INDI\n"
+    "1 SOUR @S1@\n"
+    "2 PAGE Page 12\n"
+    "3 NOTE Mention manuscrite\n"
+    "0 @I2@ INDI\n"
+    "1 SOUR @S9@\n"
+    "2 PAGE Référence orpheline\n"
+    "0 @R1@ REPO\n"
+    "1 NAME Archives Municipales\n"
+    "1 ADDR Mairie annexe\n"
+    "2 CITY Saint-Denis\n"
+    "1 NOTE Horaires d'ouverture\n"
+    "0 @R2@ REPO\n"
+    "1 NAME Le Bistrot du Coin\n"
+    "0 TRLR\n";
+
+/* Parse une fixture de dépôts dans des listes neuves. */
+static int parse_repository_fixture(const char *filename, SourceList *sources,
+                                    RepositoryList *repositories) {
+    FILE *file;
+    int write_status;
+    int close_status;
+    int parse_status = -1;
+
+    init_source_list(sources);
+    init_repository_list(repositories);
+    file = fopen(filename, "w");
+    if (file == NULL) {
+        return parse_status;
+    }
+    write_status = fputs(repository_records_fixture, file);
+    close_status = fclose(file);
+    if (write_status != EOF && close_status == 0) {
+        parse_status = parse_gedcom(filename, sources, repositories);
+    }
+    remove(filename);
+    return parse_status;
 }
 
 /* Vérifie l'extraction des entités SOUR d'une fixture GEDCOM. */
@@ -393,9 +506,9 @@ static int test_nested_citation_context(void) {
 /* Vérifie qu'une erreur de lecture est distinguée d'une fin de fichier. */
 static TestResult test_read_error(void) {
     /* Given */
+#if defined(__linux__)
     const GedcomParseErrorCode expected_error_code = GEDCOM_PARSE_ERROR_READ;
     const int expected_parse_failure = 1;
-#if defined(__linux__)
     SourceList sources;
     RepositoryList repositories;
     FILE *directory;
@@ -500,70 +613,67 @@ static int test_long_gedcom_line(void) {
     return ok;
 }
 
-/* Vérifie le rejet des niveaux GEDCOM invalides. */
-static int test_invalid_gedcom_levels(void) {
+/* Vérifie le rejet d'un niveau GEDCOM qui dépasse la capacité numérique. */
+static int test_rejects_overflowing_gedcom_level(void) {
     /* Given */
+    const int expected_parse_failure = 1;
     const GedcomParseErrorCode expected_error_code =
         GEDCOM_PARSE_ERROR_INVALID_LEVEL;
     const size_t expected_error_line = 2U;
-    const int expected_parse_success = 0;
-    static const char *invalid_lines[] = {
-        "999999999999999999999999999999999999 SOUR @S1@\n", "100 SOUR @S1@\n",
-        "1x SOUR @S1@\n"};
-    const char *filename = "tmp_invalid_gedcom_level.ged";
-    size_t index;
+    const InvalidGedcomLevelCase test_case = {
+        .filename = "tmp_overflowing_gedcom_level.ged",
+        .invalid_line = "999999999999999999999999999999999999 SOUR @S1@\n"};
+    int rejected;
 
-    for (index = 0U; index < sizeof(invalid_lines) / sizeof(invalid_lines[0]);
-         index++) {
-        FILE *file = fopen(filename, "w");
-        SourceList sources;
-        RepositoryList repositories;
-        int write_status;
-        int close_status;
-        int parse_status;
-        GedcomParseError error;
+    /* When */
+    rejected =
+        rejects_invalid_gedcom_level(test_case, expected_parse_failure,
+                                     expected_error_code, expected_error_line);
 
-        if (file == NULL) {
-            printf(
-                "[FAIL] Impossible de créer le fichier de niveau invalide.\n");
-            return 0;
-        }
+    /* Then */
+    return rejected;
+}
 
-        write_status = fputs("0 @I1@ INDI\n", file);
-        if (write_status != EOF && fputs(invalid_lines[index], file) == EOF) {
-            write_status = EOF;
-        }
-        close_status = fclose(file);
-        if (write_status == EOF || close_status != 0) {
-            printf("[FAIL] Impossible d'écrire le cas de niveau invalide.\n");
-            remove(filename);
-            return 0;
-        }
+/* Vérifie le rejet d'un niveau GEDCOM hors de la profondeur permise. */
+static int test_rejects_excessive_gedcom_level(void) {
+    /* Given */
+    const int expected_parse_failure = 1;
+    const GedcomParseErrorCode expected_error_code =
+        GEDCOM_PARSE_ERROR_INVALID_LEVEL;
+    const size_t expected_error_line = 2U;
+    const InvalidGedcomLevelCase test_case = {
+        .filename = "tmp_excessive_gedcom_level.ged",
+        .invalid_line = "100 SOUR @S1@\n"};
+    int rejected;
 
-        init_source_list(&sources);
-        init_repository_list(&repositories);
-        /* When */
-        parse_status =
-            parse_gedcom_with_error(filename, &sources, &repositories, &error);
-        /* Then */
-        free_source_list(&sources);
-        free_repository_list(&repositories);
-        if (parse_status == expected_parse_success ||
-            error.code != expected_error_code ||
-            error.line_number != expected_error_line) {
-            printf(
-                "[FAIL] Le cas de niveau invalide %zu n'est pas diagnostiqué "
-                "à la ligne 2.\n",
-                index + 1U);
-            remove(filename);
-            return 0;
-        }
-    }
+    /* When */
+    rejected =
+        rejects_invalid_gedcom_level(test_case, expected_parse_failure,
+                                     expected_error_code, expected_error_line);
 
-    remove(filename);
-    printf("[PASS] Dépassement, profondeur excessive et niveau mal formé "
-           "rejetés.\n");
-    return 1;
+    /* Then */
+    return rejected;
+}
+
+/* Vérifie le rejet d'un niveau GEDCOM dont le texte est mal formé. */
+static int test_rejects_malformed_gedcom_level(void) {
+    /* Given */
+    const int expected_parse_failure = 1;
+    const GedcomParseErrorCode expected_error_code =
+        GEDCOM_PARSE_ERROR_INVALID_LEVEL;
+    const size_t expected_error_line = 2U;
+    const InvalidGedcomLevelCase test_case = {
+        .filename = "tmp_malformed_gedcom_level.ged",
+        .invalid_line = "1x SOUR @S1@\n"};
+    int rejected;
+
+    /* When */
+    rejected =
+        rejects_invalid_gedcom_level(test_case, expected_parse_failure,
+                                     expected_error_code, expected_error_line);
+
+    /* Then */
+    return rejected;
 }
 
 /* Vérifie qu'un échec d'allocation est rapporté avec sa ligne. */
@@ -709,13 +819,11 @@ static int test_orphan_citation(void) {
     return passed;
 }
 
-/* Vérifie les dépôts, leurs liens et les extraits par enregistrement. */
-static int test_repository_records(void) {
+/* Vérifie l'extraction des dépôts et de leurs liens de source. */
+static int test_extracts_repository_links(void) {
     /* Given */
-    const size_t expected_source_count = 3U;
     const size_t expected_repository_count = 2U;
     const size_t expected_link_count = 2U;
-    const size_t expected_minimum_excerpt_length = 128U;
     const int expected_parse_result = 0;
     const char *expected_first_repository_reference = "@R1@";
     const char *expected_first_repository_name = "Archives Municipales";
@@ -726,77 +834,18 @@ static int test_repository_records(void) {
     const char *expected_link_context = "@S1@ SOUR / REPO";
     const char *expected_second_link_source_reference = "@S1@";
     const char *expected_second_link_repository_reference = "@R2@";
-    const char *expected_first_citation_reference = "@S1@";
-    const char *expected_orphan_citation_reference = "@S9@";
-    const char *expected_source_start = "0 @S1@ SOUR\n";
-    const char *expected_source_continuation =
-        "2 CONT Première partie du titre\n";
-    const char *expected_repository_media = "3 MEDI Livre\n";
-    const char *unexpected_individual_record = "0 @I1@ INDI\n";
-    const char *expected_citation_excerpt =
-        "1 SOUR @S1@\n2 PAGE Page 12\n3 NOTE Mention manuscrite\n";
-    const char *unexpected_second_individual = "0 @I2@ INDI\n";
-    const char *expected_orphan_excerpt =
-        "1 SOUR @S9@\n2 PAGE Référence orpheline\n";
-    const char *expected_repository_start =
-        "0 @R1@ REPO\n1 NAME Archives Municipales\n";
-    const char *expected_repository_city = "2 CITY Saint-Denis\n";
-    const char *unexpected_second_repository = "0 @R2@ REPO\n";
-    printf("\n--- Test Enregistrements Dépôt ---\n");
-
-    static const char fixture[] =
-        "0 @S1@ SOUR\n"
-        "1 TITL Source principale\n"
-        "2 CONT Première partie du titre\n"
-        "1 NOTE Note détaillée sur la source\n"
-        "2 CONT Informations supplémentaires sur le document\n"
-        "1 REPO @R1@\n"
-        "2 CALN Étagère 4\n"
-        "3 MEDI Livre\n"
-        "1 REPO @R2@\n"
-        "0 @I1@ INDI\n"
-        "1 SOUR @S1@\n"
-        "2 PAGE Page 12\n"
-        "3 NOTE Mention manuscrite\n"
-        "0 @I2@ INDI\n"
-        "1 SOUR @S9@\n"
-        "2 PAGE Référence orpheline\n"
-        "0 @R1@ REPO\n"
-        "1 NAME Archives Municipales\n"
-        "1 ADDR Mairie annexe\n"
-        "2 CITY Saint-Denis\n"
-        "1 NOTE Horaires d'ouverture\n"
-        "0 @R2@ REPO\n"
-        "1 NAME Le Bistrot du Coin\n"
-        "0 TRLR\n";
-    const char *filename = "tmp_repository_records.ged";
-    FILE *file = fopen(filename, "w");
-    int write_status;
-    int close_status;
-    if (file == NULL) {
-        printf("[FAIL] Impossible de créer le fichier de test des dépôts.\n");
-        return 0;
-    }
-
-    write_status = fputs(fixture, file);
-    close_status = fclose(file);
-    if (write_status == EOF || close_status != 0) {
-        printf("[FAIL] Impossible d'écrire le fichier de test des dépôts.\n");
-        remove(filename);
-        return 0;
-    }
-
+    const char *filename = "tmp_repository_links.ged";
     SourceList sources;
     RepositoryList repositories;
-    init_source_list(&sources);
-    init_repository_list(&repositories);
+    int parse_result;
+    int passed;
+
     /* When */
-    int result = parse_gedcom(filename, &sources, &repositories);
+    parse_result = parse_repository_fixture(filename, &sources, &repositories);
 
     /* Then */
-    int passed =
-        result == expected_parse_result &&
-        sources.count == expected_source_count &&
+    passed =
+        parse_result == expected_parse_result &&
         repositories.count == expected_repository_count &&
         repositories.link_count == expected_link_count &&
         strcmp(repositories.repositories[0].reference,
@@ -815,11 +864,42 @@ static int test_repository_records(void) {
         strcmp(repositories.links[1].source_reference,
                expected_second_link_source_reference) == 0 &&
         strcmp(repositories.links[1].repository_reference,
-               expected_second_link_repository_reference) == 0 &&
-        strcmp(sources.sources[1].reference,
-               expected_first_citation_reference) == 0 &&
-        strcmp(sources.sources[2].reference,
-               expected_orphan_citation_reference) == 0 &&
+               expected_second_link_repository_reference) == 0;
+
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    return passed;
+}
+
+/* Vérifie que les extraits de sources et citations restent dans leur record. */
+static int test_extracts_source_excerpts(void) {
+    /* Given */
+    const int expected_parse_result = 0;
+    const size_t expected_source_count = 3U;
+    const size_t expected_minimum_excerpt_length = 128U;
+    const char *expected_source_start = "0 @S1@ SOUR\n";
+    const char *expected_source_continuation =
+        "2 CONT Première partie du titre\n";
+    const char *expected_repository_media = "3 MEDI Livre\n";
+    const char *unexpected_individual_record = "0 @I1@ INDI\n";
+    const char *expected_citation_excerpt =
+        "1 SOUR @S1@\n2 PAGE Page 12\n3 NOTE Mention manuscrite\n";
+    const char *unexpected_second_individual = "0 @I2@ INDI\n";
+    const char *expected_orphan_excerpt =
+        "1 SOUR @S9@\n2 PAGE Référence orpheline\n";
+    const char *filename = "tmp_source_excerpts.ged";
+    SourceList sources;
+    RepositoryList repositories;
+    int parse_result;
+    int passed;
+
+    /* When */
+    parse_result = parse_repository_fixture(filename, &sources, &repositories);
+
+    /* Then */
+    passed =
+        parse_result == expected_parse_result &&
+        sources.count == expected_source_count &&
         strstr(sources.sources[0].gedcom.text, expected_source_start) != NULL &&
         strstr(sources.sources[0].gedcom.text, expected_source_continuation) !=
             NULL &&
@@ -832,26 +912,41 @@ static int test_repository_records(void) {
             NULL &&
         strstr(sources.sources[1].gedcom.text, unexpected_second_individual) ==
             NULL &&
-        strstr(sources.sources[2].gedcom.text, expected_orphan_excerpt) !=
-            NULL &&
-        strstr(repositories.repositories[0].gedcom.text,
-               expected_repository_start) != NULL &&
-        strstr(repositories.repositories[0].gedcom.text,
-               expected_repository_city) != NULL &&
-        strstr(repositories.repositories[0].gedcom.text,
-               unexpected_second_repository) == NULL;
-
-    if (passed) {
-        printf("[PASS] Références et noms des dépôts extraits.\n");
-    } else {
-        printf(
-            "[FAIL] Extraction incorrecte des dépôts (code %d, %zu dépôts).\n",
-            result, repositories.count);
-    }
-
+        strstr(sources.sources[2].gedcom.text, expected_orphan_excerpt) != NULL;
     free_source_list(&sources);
     free_repository_list(&repositories);
-    remove(filename);
+    return passed;
+}
+
+/* Vérifie que l'extrait d'un dépôt exclut le dépôt qui le suit. */
+static int test_extracts_repository_excerpt(void) {
+    /* Given */
+    const int expected_parse_result = 0;
+    const size_t expected_repository_count = 2U;
+    const char *expected_repository_start =
+        "0 @R1@ REPO\n1 NAME Archives Municipales\n";
+    const char *expected_repository_city = "2 CITY Saint-Denis\n";
+    const char *unexpected_second_repository = "0 @R2@ REPO\n";
+    const char *filename = "tmp_repository_excerpt.ged";
+    SourceList sources;
+    RepositoryList repositories;
+    int parse_result;
+    int passed;
+
+    /* When */
+    parse_result = parse_repository_fixture(filename, &sources, &repositories);
+
+    /* Then */
+    passed = parse_result == expected_parse_result &&
+             repositories.count == expected_repository_count &&
+             strstr(repositories.repositories[0].gedcom.text,
+                    expected_repository_start) != NULL &&
+             strstr(repositories.repositories[0].gedcom.text,
+                    expected_repository_city) != NULL &&
+             strstr(repositories.repositories[0].gedcom.text,
+                    unexpected_second_repository) == NULL;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
     return passed;
 }
 
@@ -883,90 +978,61 @@ int main(void) {
 
     int total_passed = 0;
     int total_tests = 0;
-
-    // --- Test 1: Parsing réussi sur un fichier de test dédié ---
-    total_tests++;
-    if (test_embedded_parser_fixture()) {
-        total_passed++;
-    }
-
-    // --- Test 2: Gestion du fichier inexistant ---
-    total_tests++;
-    if (test_file_not_found()) {
-        total_passed++;
-    }
+    TestResult read_error_result;
 
     total_tests++;
-    if (test_empty_gedcom_file()) {
-        total_passed++;
-    }
-
-    // --- Test 3: Faux positif sur un mot SOUR dans du texte ---
+    total_passed +=
+        run_test("test_embedded_parser_fixture", test_embedded_parser_fixture);
     total_tests++;
-    if (test_false_positive_tag_detection()) {
-        total_passed++;
-    }
-
-    // --- Test 4: Entité source et citation avec contexte ---
+    total_passed += run_test("test_file_not_found", test_file_not_found);
     total_tests++;
-    if (test_source_entity_and_citation_context()) {
-        total_passed++;
+    total_passed += run_test("test_empty_gedcom_file", test_empty_gedcom_file);
+    total_tests++;
+    total_passed += run_test("test_false_positive_tag_detection",
+                             test_false_positive_tag_detection);
+    total_tests++;
+    total_passed += run_test("test_source_entity_and_citation_context",
+                             test_source_entity_and_citation_context);
+    total_tests++;
+    total_passed +=
+        run_test("test_nested_citation_context", test_nested_citation_context);
+
+    read_error_result = run_result_test("test_read_error", test_read_error);
+    if (read_error_result != TEST_SKIPPED) {
+        total_tests++;
+        total_passed += read_error_result == TEST_PASSED;
     }
 
     total_tests++;
-    if (test_nested_citation_context()) {
-        total_passed++;
-    }
-
-    {
-        TestResult read_error_result = test_read_error();
-
-#if defined(__linux__)
-        // cppcheck-suppress knownConditionTrueFalse
-        if (read_error_result != TEST_SKIPPED) {
-            total_tests++;
-            total_passed += read_error_result == TEST_PASSED;
-        }
-#else
-        (void)read_error_result;
-#endif
-    }
-
+    total_passed += run_test("test_long_gedcom_line", test_long_gedcom_line);
     total_tests++;
-    if (test_long_gedcom_line()) {
-        total_passed++;
-    }
-
+    total_passed += run_test("test_rejects_overflowing_gedcom_level",
+                             test_rejects_overflowing_gedcom_level);
     total_tests++;
-    if (test_invalid_gedcom_levels()) {
-        total_passed++;
-    }
-
+    total_passed += run_test("test_rejects_excessive_gedcom_level",
+                             test_rejects_excessive_gedcom_level);
     total_tests++;
-    if (test_memory_allocation_error()) {
-        total_passed++;
-    }
-
+    total_passed += run_test("test_rejects_malformed_gedcom_level",
+                             test_rejects_malformed_gedcom_level);
     total_tests++;
-    if (test_empty_filename()) {
-        total_passed++;
-    }
-
+    total_passed +=
+        run_test("test_memory_allocation_error", test_memory_allocation_error);
     total_tests++;
-    if (test_orphan_citation()) {
-        total_passed++;
-    }
-
+    total_passed += run_test("test_empty_filename", test_empty_filename);
     total_tests++;
-    if (test_repository_records()) {
-        total_passed++;
-    }
-
-    printf("\n--- Test Initialisation/Nettoyage ---\n");
+    total_passed += run_test("test_orphan_citation", test_orphan_citation);
     total_tests++;
-    if (test_source_list_initial_state()) {
-        total_passed++;
-    }
+    total_passed += run_test("test_extracts_repository_links",
+                             test_extracts_repository_links);
+    total_tests++;
+    total_passed += run_test("test_extracts_source_excerpts",
+                             test_extracts_source_excerpts);
+    total_tests++;
+    total_passed += run_test("test_extracts_repository_excerpt",
+                             test_extracts_repository_excerpt);
+    total_tests++;
+    total_passed += run_test("test_source_list_initial_state",
+                             test_source_list_initial_state);
 
     printf("\n==================================================\n");
     printf("Tests terminés. Résultat: %d/%d réussis.\n", total_passed,

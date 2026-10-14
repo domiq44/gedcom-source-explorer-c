@@ -4,6 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Helpers de test */
+
+/* Exécute un test et rapporte son résultat sous son nom. */
+static int run_test(const char *test_name, int (*test_function)(void)) {
+    int passed = test_function();
+
+    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
+    return passed;
+}
+
 /* Vérifie que xstrdup retourne la valeur attendue. */
 static int test_string_duplication(void) {
     /* Given */
@@ -29,7 +39,7 @@ static int test_trim_whitespace(void) {
     /* Given */
     const char *expected_trimmed_text = "GEDCOM data";
     char padded_text[] = " \tGEDCOM data \r\n";
-    char *trimmed_text;
+    const char *trimmed_text;
 
     /* When */
     trimmed_text = trim_whitespace(padded_text);
@@ -43,49 +53,61 @@ static int test_trim_whitespace(void) {
     return 0;
 }
 
-/* Vérifie le remplacement d'une chaîne puis son effacement par NULL. */
+/* Vérifie le remplacement d'une chaîne déjà affectée. */
 static int test_string_assignment(void) {
     /* Given */
+    const char *initial_text = "old value";
     const char *expected_assigned_text = "new value";
-    const char *expected_cleared_value = NULL;
     char *assigned;
-    int assigned_value_matches;
-    int cleared_value_matches;
 
     /* When */
-    assigned = xstrdup("old value");
+    assigned = xstrdup(initial_text);
     assign_string(&assigned, expected_assigned_text);
-    assigned_value_matches =
-        assigned != NULL && strcmp(assigned, expected_assigned_text) == 0;
-    assign_string(&assigned, NULL);
-    cleared_value_matches = assigned == expected_cleared_value;
 
     /* Then */
-    if (assigned_value_matches && cleared_value_matches) {
-        printf("[PASS] Remplacement et effacement d'une chaîne\n");
+    if (assigned != NULL && strcmp(assigned, expected_assigned_text) == 0) {
+        printf("[PASS] Remplacement d'une chaîne\n");
         free(assigned);
         return 1;
     }
-    printf("[FAIL] Remplacement ou effacement d'une chaîne\n");
+    printf("[FAIL] Remplacement d'une chaîne\n");
     free(assigned);
     return 0;
 }
 
-/* Vérifie le retrait du BOM sans modifier une chaîne ordinaire. */
+/* Vérifie que assign_string efface une valeur lorsque la source est NULL. */
+static int test_string_assignment_clears_null(void) {
+    /* Given */
+    const char *initial_text = "old value";
+    const char *expected_cleared_value = NULL;
+    char *assigned;
+
+    /* When */
+    assigned = xstrdup(initial_text);
+    assign_string(&assigned, NULL);
+
+    /* Then */
+    if (assigned == expected_cleared_value) {
+        printf("[PASS] Effacement d'une chaîne avec NULL\n");
+        free(assigned);
+        return 1;
+    }
+    printf("[FAIL] Effacement d'une chaîne avec NULL\n");
+    free(assigned);
+    return 0;
+}
+
+/* Vérifie le retrait du BOM UTF-8 au début d'une chaîne. */
 static int test_strip_utf8_bom(void) {
     /* Given */
     const char *expected_bom_text = "GED";
-    const char *expected_plain_text = "GEDCOM";
     char bom_text[] = {(char)0xEF, (char)0xBB, (char)0xBF, 'G', 'E', 'D', '\0'};
-    char plain_text[] = "GEDCOM";
 
     /* When */
     strip_utf8_bom(bom_text);
-    strip_utf8_bom(plain_text);
 
     /* Then */
-    if (strcmp(bom_text, expected_bom_text) == 0 &&
-        strcmp(plain_text, expected_plain_text) == 0) {
+    if (strcmp(bom_text, expected_bom_text) == 0) {
         printf("[PASS] Retrait du BOM UTF-8\n");
         return 1;
     }
@@ -93,15 +115,38 @@ static int test_strip_utf8_bom(void) {
     return 0;
 }
 
+/* Vérifie qu'une chaîne sans BOM reste inchangée. */
+static int test_strip_utf8_bom_preserves_plain_text(void) {
+    /* Given */
+    const char *expected_plain_text = "GEDCOM";
+    char plain_text[] = "GEDCOM";
+
+    /* When */
+    strip_utf8_bom(plain_text);
+
+    /* Then */
+    if (strcmp(plain_text, expected_plain_text) == 0) {
+        printf("[PASS] Conservation d'une chaîne sans BOM\n");
+        return 1;
+    }
+    printf("[FAIL] Conservation d'une chaîne sans BOM\n");
+    return 0;
+}
+
 /* Exécute les tests unitaires des utilitaires de chaînes. */
 int main(void) {
-    const int total_tests = 4;
+    const int total_tests = 6;
     int passed_tests = 0;
 
-    passed_tests += test_string_duplication();
-    passed_tests += test_trim_whitespace();
-    passed_tests += test_string_assignment();
-    passed_tests += test_strip_utf8_bom();
+    passed_tests +=
+        run_test("test_string_duplication", test_string_duplication);
+    passed_tests += run_test("test_trim_whitespace", test_trim_whitespace);
+    passed_tests += run_test("test_string_assignment", test_string_assignment);
+    passed_tests += run_test("test_string_assignment_clears_null",
+                             test_string_assignment_clears_null);
+    passed_tests += run_test("test_strip_utf8_bom", test_strip_utf8_bom);
+    passed_tests += run_test("test_strip_utf8_bom_preserves_plain_text",
+                             test_strip_utf8_bom_preserves_plain_text);
 
     printf("Résultat string_utils: %d/%d réussis.\n", passed_tests,
            total_tests);

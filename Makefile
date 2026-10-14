@@ -74,13 +74,18 @@ report: $(TARGET) $(WEB_DIR)/report.html $(WEB_DIR)/report.css $(WEB_DIR)/report
 	./$(TARGET) --html "$(GEDCOM)" "$(REPORT_HTML)"
 
 test: $(TEST_TARGETS)
-	./$(PARSER_TEST_TARGET)
-	./$(CONTEXT_TEST_TARGET)
-	./$(SOURCE_LIST_TEST_TARGET)
-	./$(STRING_UTILS_TEST_TARGET)
-	./$(REPOSITORY_LIST_TEST_TARGET)
-	./$(HTML_REPORT_TEST_TARGET)
-	./$(SOURCE_ORDER_TEST_TARGET)
+	@status=0; \
+	for test_binary in $(TEST_TARGETS); do \
+		test_name=$${test_binary##*/}; \
+		printf '\n=== %s ===\n' "$$test_name"; \
+		if "$$test_binary"; then \
+			printf '[PASS] %s\n' "$$test_name"; \
+		else \
+			printf '[FAIL] %s\n' "$$test_name"; \
+			status=1; \
+		fi; \
+	done; \
+	exit $$status
 
 test-browser: $(TARGET) $(BROWSER_TEST_GEDCOM) $(WEB_DIR)/report.html $(WEB_DIR)/report.css $(WEB_DIR)/report.js
 	mkdir -p $(BROWSER_TEST_DIR)

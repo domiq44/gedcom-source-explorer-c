@@ -4,19 +4,31 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Helpers de test */
+
+typedef struct {
+    const char *payload;
+    const char *special_value;
+} ReportInput;
+
+typedef struct {
+    const char *contents;
+    const char *template_filename;
+    const char *output_filename;
+} TemplateInput;
+
 /* Prépare les sources communes aux tests du rendu HTML. */
 static int prepare_report_inputs(SourceList *sources,
                                  RepositoryList *repositories,
-                                 const char *payload,
-                                 const char *special_value) {
+                                 const ReportInput *input) {
     const SourceInput source = {
-        .description = payload,
+        .description = input->payload,
         .reference = "@S1@",
         .kind = "entity",
         .context = "entity",
     };
     const SourceInput special_citation = {
-        .description = special_value,
+        .description = input->special_value,
         .reference = "@S99@",
         .kind = "citation",
         .context = "@I99@ INDI",
@@ -62,39 +74,105 @@ static int read_generated_report(const char *filename,
     return read_succeeded;
 }
 
-/* Vérifie que les arguments invalides du générateur sont rejetés. */
-static int test_rejects_invalid_report_arguments(void) {
+/* Écrit un template puis indique si le générateur le rejette. */
+static int rejects_template(const TemplateInput *input) {
+    FILE *template_file = fopen(input->template_filename, "w");
+    SourceList sources;
+    RepositoryList repositories;
+    int write_status;
+    int close_status;
+    int rejected;
+
+    if (template_file == NULL) {
+        return 0;
+    }
+    write_status = fputs(input->contents, template_file);
+    close_status = fclose(template_file);
+    if (write_status == EOF || close_status != 0) {
+        remove(input->template_filename);
+        return 0;
+    }
+
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    rejected =
+        write_html_report(input->template_filename, input->output_filename,
+                          &sources, &repositories) != 0;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    remove(input->template_filename);
+    remove(input->output_filename);
+    return rejected;
+}
+
+/* Exécute un test et rapporte son résultat sous son nom. */
+static int run_test(const char *test_name, int (*test_function)(void)) {
+    int passed = test_function();
+
+    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
+    return passed;
+}
+
+/* Vérifie qu'un chemin de template vide est rejeté. */
+static int test_rejects_empty_template_path(void) {
     /* Given */
-    const char *valid_template_filename = "web/report.html";
-    const char *valid_output_filename = "tmp_html_report_invalid_args.html";
-    const int expected_success_status = 0;
     const int expected_rejected = 1;
+    const char *output_filename = "tmp_html_report_empty_template.html";
     ReportData empty_data = {0};
-    int empty_template_rejected;
-    int empty_output_rejected;
-    int null_data_rejected;
+    int rejected;
 
     /* When */
-    empty_template_rejected =
-        write_html_report_data("", valid_output_filename, &empty_data) !=
-        expected_success_status;
-    empty_output_rejected =
-        write_html_report_data(valid_template_filename, "", &empty_data) !=
-        expected_success_status;
-    null_data_rejected =
-        write_html_report_data(valid_template_filename, valid_output_filename,
-                               NULL) != expected_success_status;
+    rejected = write_html_report_data("", output_filename, &empty_data) != 0;
 
     /* Then */
-    if (empty_template_rejected == expected_rejected &&
-        empty_output_rejected == expected_rejected &&
-        null_data_rejected == expected_rejected) {
-        printf("[PASS] Les erreurs de saisie sur le rapport sont rejetées.\n");
+    remove(output_filename);
+    if (rejected == expected_rejected) {
+        printf("[PASS] Rejet d'un chemin de template vide.\n");
         return 1;
     }
-    printf(
-        "[FAIL] Les erreurs de saisie sur le rapport ne sont pas rejetées.\n");
-    remove(valid_output_filename);
+    printf("[FAIL] Rejet d'un chemin de template vide.\n");
+    return 0;
+}
+
+/* Vérifie qu'un chemin de sortie vide est rejeté. */
+static int test_rejects_empty_output_path(void) {
+    /* Given */
+    const int expected_rejected = 1;
+    const char *template_filename = "web/report.html";
+    ReportData empty_data = {0};
+    int rejected;
+
+    /* When */
+    rejected = write_html_report_data(template_filename, "", &empty_data) != 0;
+
+    /* Then */
+    if (rejected == expected_rejected) {
+        printf("[PASS] Rejet d'un chemin de sortie vide.\n");
+        return 1;
+    }
+    printf("[FAIL] Rejet d'un chemin de sortie vide.\n");
+    return 0;
+}
+
+/* Vérifie qu'un pointeur de données NULL est rejeté. */
+static int test_rejects_null_report_data(void) {
+    /* Given */
+    const int expected_rejected = 1;
+    const char *template_filename = "web/report.html";
+    const char *output_filename = "tmp_html_report_null_data.html";
+    int rejected;
+
+    /* When */
+    rejected =
+        write_html_report_data(template_filename, output_filename, NULL) != 0;
+
+    /* Then */
+    remove(output_filename);
+    if (rejected == expected_rejected) {
+        printf("[PASS] Rejet d'un rapport NULL.\n");
+        return 1;
+    }
+    printf("[FAIL] Rejet d'un rapport NULL.\n");
     return 0;
 }
 
@@ -114,6 +192,8 @@ static int test_escapes_report_data(void) {
     const char *expected_escaped_special_value =
         "\"description\":\"quote \\\" slash \\\\ backspace \\b formfeed \\f "
         "newline \\n carriage \\r tab \\t control \\u0001 amp \\u0026\"";
+    const ReportInput input = {.payload = payload,
+                               .special_value = special_value};
     SourceList sources;
     RepositoryList repositories;
     char contents[8192];
@@ -122,8 +202,7 @@ static int test_escapes_report_data(void) {
     int passed;
 
     /* When */
-    inputs_ready =
-        prepare_report_inputs(&sources, &repositories, payload, special_value);
+    inputs_ready = prepare_report_inputs(&sources, &repositories, &input);
     report_read =
         inputs_ready && read_generated_report(filename, &sources, &repositories,
                                               contents, sizeof(contents));
@@ -169,22 +248,22 @@ static int test_renders_navigation_controls(void) {
         "<option value=\"50\">"};
     const char *payload = "navigation";
     const char *special_value = "citation";
+    const ReportInput input = {.payload = payload,
+                               .special_value = special_value};
     SourceList sources;
     RepositoryList repositories;
     char contents[8192];
     int inputs_ready;
     int report_read;
     int all_markers_found = 1;
-    size_t marker_index;
 
     /* When */
-    inputs_ready =
-        prepare_report_inputs(&sources, &repositories, payload, special_value);
+    inputs_ready = prepare_report_inputs(&sources, &repositories, &input);
     report_read =
         inputs_ready && read_generated_report(filename, &sources, &repositories,
                                               contents, sizeof(contents));
     if (report_read) {
-        for (marker_index = 0U;
+        for (size_t marker_index = 0U;
              marker_index < sizeof(expected_navigation_markers) /
                                 sizeof(expected_navigation_markers[0]);
              marker_index++) {
@@ -218,6 +297,8 @@ static int test_renders_scroll_destinations(void) {
     const char *filename = "tmp_html_report_scroll.html";
     const char *payload = "scroll";
     const char *special_value = "citation";
+    const ReportInput input = {.payload = payload,
+                               .special_value = special_value};
     const char *expected_scroll_markers[] = {
         "role=\"radiogroup\" aria-label=\"Défilement automatique\"",
         "id=\"scroll-none\" type=\"radio\" name=\"section-scroll-target\" "
@@ -232,16 +313,14 @@ static int test_renders_scroll_destinations(void) {
     int inputs_ready;
     int report_read;
     int all_markers_found = 1;
-    size_t marker_index;
 
     /* When */
-    inputs_ready =
-        prepare_report_inputs(&sources, &repositories, payload, special_value);
+    inputs_ready = prepare_report_inputs(&sources, &repositories, &input);
     report_read =
         inputs_ready && read_generated_report(filename, &sources, &repositories,
                                               contents, sizeof(contents));
     if (report_read) {
-        for (marker_index = 0U;
+        for (size_t marker_index = 0U;
              marker_index < sizeof(expected_scroll_markers) /
                                 sizeof(expected_scroll_markers[0]);
              marker_index++) {
@@ -275,6 +354,8 @@ static int test_preserves_control_order(void) {
     const char *filename = "tmp_html_report_control_order.html";
     const char *payload = "order";
     const char *special_value = "citation";
+    const ReportInput input = {.payload = payload,
+                               .special_value = special_value};
     const char *expected_control_order[] = {
         "id=\"scroll-none\"",      "id=\"scroll-repositories\"",
         "id=\"scroll-citations\"", "id=\"first-source\"",
@@ -288,17 +369,16 @@ static int test_preserves_control_order(void) {
     int inputs_ready;
     int report_read;
     int order_is_correct = 1;
-    const char *previous = NULL;
-    size_t marker_index;
 
     /* When */
-    inputs_ready =
-        prepare_report_inputs(&sources, &repositories, payload, special_value);
+    inputs_ready = prepare_report_inputs(&sources, &repositories, &input);
     report_read =
         inputs_ready && read_generated_report(filename, &sources, &repositories,
                                               contents, sizeof(contents));
     if (report_read) {
-        for (marker_index = 0U;
+        const char *previous = NULL;
+
+        for (size_t marker_index = 0U;
              marker_index <
              sizeof(expected_control_order) / sizeof(expected_control_order[0]);
              marker_index++) {
@@ -326,77 +406,73 @@ static int test_preserves_control_order(void) {
     return order_is_correct;
 }
 
-/* Vérifie le rejet des templates sans marqueur unique de données. */
-static int test_rejects_invalid_templates(void) {
+/* Vérifie le rejet d'un template sans marqueur de données. */
+static int test_rejects_template_without_marker(void) {
     /* Given */
-    const char *invalid_template_filename = "tmp_html_report_template.html";
-    const char *invalid_output_filename = "tmp_html_report_invalid.html";
-    const int expected_success_status = 0;
     const int expected_rejected = 1;
-    const char *template_contents[] = {
-        "<!doctype html><p>Missing data marker</p>\n",
-        "{{GEDCOM_REPORT_DATA}} {{GEDCOM_REPORT_DATA}}\n",
-    };
-    SourceList sources;
-    RepositoryList repositories;
-    size_t template_index;
-    int all_templates_rejected = 1;
+    const TemplateInput input = {
+        .contents = "<!doctype html><p>Missing data marker</p>\n",
+        .template_filename = "tmp_html_report_template_without_marker.html",
+        .output_filename = "tmp_html_report_invalid_without_marker.html"};
+    int rejected;
 
     /* When */
-    init_source_list(&sources);
-    init_repository_list(&repositories);
-    for (template_index = 0U; template_index < sizeof(template_contents) /
-                                                   sizeof(template_contents[0]);
-         template_index++) {
-        FILE *template_file = fopen(invalid_template_filename, "w");
-        int write_status;
-        int close_status;
-
-        if (template_file == NULL) {
-            all_templates_rejected = 0;
-            break;
-        }
-        write_status = fputs(template_contents[template_index], template_file);
-        close_status = fclose(template_file);
-        if (write_status == EOF || close_status != 0) {
-            all_templates_rejected = 0;
-            remove(invalid_template_filename);
-            break;
-        }
-        if (write_html_report(invalid_template_filename,
-                              invalid_output_filename, &sources,
-                              &repositories) == expected_success_status) {
-            all_templates_rejected = 0;
-        }
-        remove(invalid_template_filename);
-        remove(invalid_output_filename);
-    }
+    rejected = rejects_template(&input);
 
     /* Then */
-    if (all_templates_rejected == expected_rejected) {
-        printf("[PASS] Les templates sans marqueur unique sont rejetés.\n");
-    } else {
-        printf("[FAIL] Un template invalide a été accepté ou n'a pas pu être "
-               "testé.\n");
+    if (rejected == expected_rejected) {
+        printf("[PASS] Rejet d'un template sans marqueur.\n");
+        return 1;
     }
-    free_source_list(&sources);
-    free_repository_list(&repositories);
-    remove(invalid_template_filename);
-    remove(invalid_output_filename);
-    return all_templates_rejected;
+    printf("[FAIL] Rejet d'un template sans marqueur.\n");
+    return 0;
+}
+
+/* Vérifie le rejet d'un template avec plusieurs marqueurs de données. */
+static int test_rejects_template_with_duplicate_markers(void) {
+    /* Given */
+    const int expected_rejected = 1;
+    const TemplateInput input = {
+        .contents = "{{GEDCOM_REPORT_DATA}} {{GEDCOM_REPORT_DATA}}\n",
+        .template_filename = "tmp_html_report_template_duplicate_markers.html",
+        .output_filename = "tmp_html_report_invalid_duplicate_markers.html"};
+    int rejected;
+
+    /* When */
+    rejected = rejects_template(&input);
+
+    /* Then */
+    if (rejected == expected_rejected) {
+        printf("[PASS] Rejet d'un template avec marqueurs dupliqués.\n");
+        return 1;
+    }
+    printf("[FAIL] Rejet d'un template avec marqueurs dupliqués.\n");
+    return 0;
 }
 
 /* Exécute les tests unitaires du rapport HTML. */
 int main(void) {
-    const int total_tests = 6;
+    const int total_tests = 9;
     int passed_tests = 0;
 
-    passed_tests += test_rejects_invalid_report_arguments();
-    passed_tests += test_escapes_report_data();
-    passed_tests += test_renders_navigation_controls();
-    passed_tests += test_renders_scroll_destinations();
-    passed_tests += test_preserves_control_order();
-    passed_tests += test_rejects_invalid_templates();
+    passed_tests += run_test("test_rejects_empty_template_path",
+                             test_rejects_empty_template_path);
+    passed_tests += run_test("test_rejects_empty_output_path",
+                             test_rejects_empty_output_path);
+    passed_tests += run_test("test_rejects_null_report_data",
+                             test_rejects_null_report_data);
+    passed_tests +=
+        run_test("test_escapes_report_data", test_escapes_report_data);
+    passed_tests += run_test("test_renders_navigation_controls",
+                             test_renders_navigation_controls);
+    passed_tests += run_test("test_renders_scroll_destinations",
+                             test_renders_scroll_destinations);
+    passed_tests +=
+        run_test("test_preserves_control_order", test_preserves_control_order);
+    passed_tests += run_test("test_rejects_template_without_marker",
+                             test_rejects_template_without_marker);
+    passed_tests += run_test("test_rejects_template_with_duplicate_markers",
+                             test_rejects_template_with_duplicate_markers);
 
     printf("Résultat html_report: %d/%d réussis.\n", passed_tests, total_tests);
     return passed_tests == total_tests ? 0 : 1;

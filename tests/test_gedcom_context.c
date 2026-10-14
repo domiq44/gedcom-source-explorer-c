@@ -3,6 +3,16 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Helpers de test */
+
+/* Exécute un test et rapporte son résultat sous son nom. */
+static int run_test(const char *test_name, int (*test_function)(void)) {
+    int passed = test_function();
+
+    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
+    return passed;
+}
+
 /* Compare le contexte produit à la valeur attendue et affiche le résultat. */
 static int check_context(const char *actual, const char *expected,
                          const char *test_name) {
@@ -61,9 +71,12 @@ int main(void) {
     const int total = 3;
     int passed = 0;
 
-    passed += test_context_with_parent_tag();
-    passed += test_context_without_parent_tag();
-    passed += test_context_without_record_identifier();
+    passed +=
+        run_test("test_context_with_parent_tag", test_context_with_parent_tag);
+    passed += run_test("test_context_without_parent_tag",
+                       test_context_without_parent_tag);
+    passed += run_test("test_context_without_record_identifier",
+                       test_context_without_record_identifier);
 
     printf("Résultat context: %d/%d réussis.\n", passed, total);
     return (passed == total) ? 0 : 1;
