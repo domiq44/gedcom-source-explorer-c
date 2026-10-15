@@ -674,6 +674,7 @@ make run      # analyse gedcom-test.ged
 make run GEDCOM=mon_fichier.ged  # analyse le fichier précisé
 make report GEDCOM=gedcom-test.ged  # génère le rapport HTML statique
 make test     # compile et exécute les tests
+make test-sanitize # exécute les tests avec AddressSanitizer et UBSan
 make test-browser # exécute les tests Playwright du rapport dans Chromium
 make dist     # crée une archive binaire pour l'OS et l'architecture courants
 make format   # reformate les fichiers C, en-têtes et tests
@@ -683,6 +684,28 @@ make clean    # supprime les artefacts de compilation
 make clean-browser # supprime node_modules et les résultats Playwright
 make clean-all # effectue les deux nettoyages
 ```
+
+### Parcours de développement recommandé
+
+Pendant le développement, `make test` compile le programme et les tests, puis
+exécute les suites C et le test d'intégration de la ligne de commande. Pour
+vérifier rapidement que le programme compile sans lancer les tests, utilise
+`make`.
+
+Avant un commit, exécute les tests avec les sanitizers et les deux analyses
+statiques :
+
+```bash
+make test-sanitize
+make lint
+make cppcheck
+```
+
+`make test-sanitize` relance toute la suite de tests avec AddressSanitizer et
+UndefinedBehaviorSanitizer; il remplace donc `make test` dans cette séquence.
+Après une modification de l'interface ou du JavaScript du rapport, lance aussi
+`make test-browser`. La préparation des dépendances navigateur, à faire une
+seule fois, se fait avec `make setup-browser-tests`.
 
 `make report` valorise le template `web/report.html` en y insérant le JSON des
 données, puis place le résultat dans `build/report/index.html`. Les fichiers CSS
@@ -727,7 +750,7 @@ rapport généré avec vos propres données. Les captures sont enregistrées dan
 ## Tests
 
 Les tests sont séparés par responsabilité dans le répertoire `tests/`. `make test`
-compile puis exécute sept binaires indépendants :
+compile puis exécute sept suites C indépendantes et un test d'intégration CLI :
 
 - `build/test_parser`
 - `build/test_gedcom_context`
