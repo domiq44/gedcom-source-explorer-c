@@ -77,7 +77,7 @@ report: $(TARGET) $(WEB_DIR)/report.html $(WEB_DIR)/report.css $(WEB_DIR)/report
 	cp $(WEB_DIR)/report.css $(WEB_DIR)/report.js $(REPORT_DIR)/
 	./$(TARGET) --html "$(GEDCOM)" "$(REPORT_HTML)"
 
-test: $(TEST_TARGETS)
+test: $(TEST_TARGETS) $(TARGET)
 	@status=0; \
 	for test_binary in $(TEST_TARGETS); do \
 		test_name=$${test_binary##*/}; \
@@ -89,6 +89,12 @@ test: $(TEST_TARGETS)
 			status=1; \
 		fi; \
 	done; \
+	if bash $(TEST_DIR)/test_cli.sh "$(abspath $(TARGET))" "$(abspath $(BROWSER_TEST_GEDCOM))" "$(abspath $(WEB_DIR)/report.html)"; then \
+		printf '[PASS] test_cli\n'; \
+	else \
+		printf '[FAIL] test_cli\n'; \
+		status=1; \
+	fi; \
 	exit $$status
 
 test-sanitize:

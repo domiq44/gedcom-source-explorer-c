@@ -7,6 +7,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+static int ensure_directory(const char *path) {
+    struct stat status;
+
+    if (mkdir(path, 0777) == 0) {
+        return 1;
+    }
+    return errno == EEXIST && stat(path, &status) == 0 &&
+           S_ISDIR(status.st_mode);
+}
+
+static int ensure_default_report_directory(void) {
+    return ensure_directory("build") && ensure_directory("build/report");
+}
 
 static int is_source_entity(const Source *source) {
     return source->kind != NULL && strcmp(source->kind, "entity") == 0;
@@ -272,6 +288,11 @@ int main(int argc, char *argv[]) {
         report_mode = 1;
         filename = argv[2];
         report_filename = (argc == 4) ? argv[3] : "build/report/index.html";
+        if (argc == 3 && !ensure_default_report_directory()) {
+            fprintf(stderr,
+                    "\n[ERREUR] Impossible de créer le dossier du rapport HTML.\n");
+            return 1;
+        }
     } else {
         filename = argv[1];
         printf("==================================================\n");
