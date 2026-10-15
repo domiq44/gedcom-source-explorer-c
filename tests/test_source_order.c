@@ -1,4 +1,5 @@
 #include "source_order.h"
+#include "test_reporter.h"
 
 #include <stdio.h>
 
@@ -6,16 +7,6 @@ typedef struct {
     const char *left;
     const char *right;
 } ReferencePair;
-
-/* Helpers de test */
-
-/* Exécute un test et rapporte son résultat sous son nom. */
-static int run_test(const char *test_name, int (*test_function)(void)) {
-    int passed = test_function();
-
-    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
-    return passed;
-}
 
 /* Vérifie que les références sont ordonnées selon leur suffixe numérique. */
 static int test_numeric_order(void) {
@@ -142,17 +133,32 @@ static int test_case_insensitive_order(void) {
 int main(void) {
     const int total = 8;
     int passed = 0;
+    int test_result;
 
-    passed += run_test("test_numeric_order", test_numeric_order);
-    passed += run_test("test_letter_order", test_letter_order);
-    passed += run_test("test_leading_zero_order", test_leading_zero_order);
-    passed += run_test("test_large_suffix_order", test_large_suffix_order);
-    passed += run_test("test_null_order", test_null_order);
-    passed += run_test("test_missing_suffix_order", test_missing_suffix_order);
-    passed += run_test("test_malformed_reference_order",
-                       test_malformed_reference_order);
-    passed +=
-        run_test("test_case_insensitive_order", test_case_insensitive_order);
+    test_result = test_numeric_order();
+    report_test_result("test_numeric_order", test_result);
+    passed += test_result;
+    test_result = test_letter_order();
+    report_test_result("test_letter_order", test_result);
+    passed += test_result;
+    test_result = test_leading_zero_order();
+    report_test_result("test_leading_zero_order", test_result);
+    passed += test_result;
+    test_result = test_large_suffix_order();
+    report_test_result("test_large_suffix_order", test_result);
+    passed += test_result;
+    test_result = test_null_order();
+    report_test_result("test_null_order", test_result);
+    passed += test_result;
+    test_result = test_missing_suffix_order();
+    report_test_result("test_missing_suffix_order", test_result);
+    passed += test_result;
+    test_result = test_malformed_reference_order();
+    report_test_result("test_malformed_reference_order", test_result);
+    passed += test_result;
+    test_result = test_case_insensitive_order();
+    report_test_result("test_case_insensitive_order", test_result);
+    passed += test_result;
 
     printf("Résultat source_order: %d/%d réussis.\n", passed, total);
     return (passed == total) ? 0 : 1;

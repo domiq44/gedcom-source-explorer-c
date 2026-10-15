@@ -1,18 +1,9 @@
 #include "string_utils.h"
+#include "test_reporter.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* Helpers de test */
-
-/* Exécute un test et rapporte son résultat sous son nom. */
-static int run_test(const char *test_name, int (*test_function)(void)) {
-    int passed = test_function();
-
-    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
-    return passed;
-}
 
 /* Vérifie que xstrdup retourne la valeur attendue. */
 static int test_string_duplication(void) {
@@ -115,16 +106,26 @@ static int test_strip_utf8_bom_preserves_plain_text(void) {
 int main(void) {
     const int total_tests = 6;
     int passed_tests = 0;
+    int test_result;
 
-    passed_tests +=
-        run_test("test_string_duplication", test_string_duplication);
-    passed_tests += run_test("test_trim_whitespace", test_trim_whitespace);
-    passed_tests += run_test("test_string_assignment", test_string_assignment);
-    passed_tests += run_test("test_string_assignment_clears_null",
-                             test_string_assignment_clears_null);
-    passed_tests += run_test("test_strip_utf8_bom", test_strip_utf8_bom);
-    passed_tests += run_test("test_strip_utf8_bom_preserves_plain_text",
-                             test_strip_utf8_bom_preserves_plain_text);
+    test_result = test_string_duplication();
+    report_test_result("test_string_duplication", test_result);
+    passed_tests += test_result;
+    test_result = test_trim_whitespace();
+    report_test_result("test_trim_whitespace", test_result);
+    passed_tests += test_result;
+    test_result = test_string_assignment();
+    report_test_result("test_string_assignment", test_result);
+    passed_tests += test_result;
+    test_result = test_string_assignment_clears_null();
+    report_test_result("test_string_assignment_clears_null", test_result);
+    passed_tests += test_result;
+    test_result = test_strip_utf8_bom();
+    report_test_result("test_strip_utf8_bom", test_result);
+    passed_tests += test_result;
+    test_result = test_strip_utf8_bom_preserves_plain_text();
+    report_test_result("test_strip_utf8_bom_preserves_plain_text", test_result);
+    passed_tests += test_result;
 
     printf("Résultat string_utils: %d/%d réussis.\n", passed_tests,
            total_tests);

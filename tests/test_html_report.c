@@ -1,4 +1,5 @@
 #include "html_report.h"
+#include "test_reporter.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,14 +84,6 @@ static int write_template_fixture(const TemplateInput *input) {
         return 0;
     }
     return 1;
-}
-
-/* Exécute un test et rapporte son résultat sous son nom. */
-static int run_test(const char *test_name, int (*test_function)(void)) {
-    int passed = test_function();
-
-    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
-    return passed;
 }
 
 /* Vérifie qu'un chemin de template vide est rejeté. */
@@ -464,25 +457,36 @@ static int test_rejects_template_with_duplicate_markers(void) {
 int main(void) {
     const int total_tests = 9;
     int passed_tests = 0;
+    int test_result;
 
-    passed_tests += run_test("test_rejects_empty_template_path",
-                             test_rejects_empty_template_path);
-    passed_tests += run_test("test_rejects_empty_output_path",
-                             test_rejects_empty_output_path);
-    passed_tests += run_test("test_rejects_null_report_data",
-                             test_rejects_null_report_data);
-    passed_tests +=
-        run_test("test_escapes_report_data", test_escapes_report_data);
-    passed_tests += run_test("test_renders_navigation_controls",
-                             test_renders_navigation_controls);
-    passed_tests += run_test("test_renders_scroll_destinations",
-                             test_renders_scroll_destinations);
-    passed_tests +=
-        run_test("test_preserves_control_order", test_preserves_control_order);
-    passed_tests += run_test("test_rejects_template_without_marker",
-                             test_rejects_template_without_marker);
-    passed_tests += run_test("test_rejects_template_with_duplicate_markers",
-                             test_rejects_template_with_duplicate_markers);
+    test_result = test_rejects_empty_template_path();
+    report_test_result("test_rejects_empty_template_path", test_result);
+    passed_tests += test_result;
+    test_result = test_rejects_empty_output_path();
+    report_test_result("test_rejects_empty_output_path", test_result);
+    passed_tests += test_result;
+    test_result = test_rejects_null_report_data();
+    report_test_result("test_rejects_null_report_data", test_result);
+    passed_tests += test_result;
+    test_result = test_escapes_report_data();
+    report_test_result("test_escapes_report_data", test_result);
+    passed_tests += test_result;
+    test_result = test_renders_navigation_controls();
+    report_test_result("test_renders_navigation_controls", test_result);
+    passed_tests += test_result;
+    test_result = test_renders_scroll_destinations();
+    report_test_result("test_renders_scroll_destinations", test_result);
+    passed_tests += test_result;
+    test_result = test_preserves_control_order();
+    report_test_result("test_preserves_control_order", test_result);
+    passed_tests += test_result;
+    test_result = test_rejects_template_without_marker();
+    report_test_result("test_rejects_template_without_marker", test_result);
+    passed_tests += test_result;
+    test_result = test_rejects_template_with_duplicate_markers();
+    report_test_result("test_rejects_template_with_duplicate_markers",
+                       test_result);
+    passed_tests += test_result;
 
     printf("Résultat html_report: %d/%d réussis.\n", passed_tests, total_tests);
     return passed_tests == total_tests ? 0 : 1;

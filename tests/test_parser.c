@@ -1,5 +1,6 @@
 #include "gedcom_parser.h"
 #include "string_utils.h"
+#include "test_reporter.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,26 +13,6 @@ typedef struct {
 } InvalidGedcomLevelCase;
 
 // --- Fonctions utilitaires de test ---
-
-/* Exécute un test booléen et rapporte son résultat sous son nom. */
-static int run_test(const char *test_name, int (*test_function)(void)) {
-    int passed = test_function();
-
-    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
-    return passed;
-}
-
-/* Exécute un test qui peut être ignoré selon la plateforme. */
-static TestResult run_result_test(const char *test_name,
-                                  TestResult (*test_function)(void)) {
-    TestResult result = test_function();
-
-    printf("[%s] %s\n",
-           result == TEST_PASSED ? "PASS"
-                                 : (result == TEST_SKIPPED ? "SKIP" : "FAIL"),
-           test_name);
-    return result;
-}
 
 /* Écrit une fixture et garantit sa fermeture avant le test. */
 static int write_text_fixture(const char *filename, const char *contents) {
@@ -871,63 +852,88 @@ int main(void) {
     int total_passed = 0;
     int total_tests = 0;
     TestResult read_error_result;
+    int test_result;
 
+    test_result = test_embedded_parser_fixture();
+    report_test_result("test_embedded_parser_fixture", test_result);
     total_tests++;
-    total_passed +=
-        run_test("test_embedded_parser_fixture", test_embedded_parser_fixture);
+    total_passed += test_result;
+    test_result = test_file_not_found();
+    report_test_result("test_file_not_found", test_result);
     total_tests++;
-    total_passed += run_test("test_file_not_found", test_file_not_found);
+    total_passed += test_result;
+    test_result = test_empty_gedcom_file();
+    report_test_result("test_empty_gedcom_file", test_result);
     total_tests++;
-    total_passed += run_test("test_empty_gedcom_file", test_empty_gedcom_file);
+    total_passed += test_result;
+    test_result = test_false_positive_tag_detection();
+    report_test_result("test_false_positive_tag_detection", test_result);
     total_tests++;
-    total_passed += run_test("test_false_positive_tag_detection",
-                             test_false_positive_tag_detection);
+    total_passed += test_result;
+    test_result = test_source_entity_and_citation_context();
+    report_test_result("test_source_entity_and_citation_context", test_result);
     total_tests++;
-    total_passed += run_test("test_source_entity_and_citation_context",
-                             test_source_entity_and_citation_context);
+    total_passed += test_result;
+    test_result = test_nested_citation_context();
+    report_test_result("test_nested_citation_context", test_result);
     total_tests++;
-    total_passed +=
-        run_test("test_nested_citation_context", test_nested_citation_context);
+    total_passed += test_result;
 
-    read_error_result = run_result_test("test_read_error", test_read_error);
+    read_error_result = test_read_error();
+    report_test_result("test_read_error", read_error_result);
     if (read_error_result != TEST_SKIPPED) {
         total_tests++;
         total_passed += read_error_result == TEST_PASSED;
     }
 
+    test_result = test_long_gedcom_line();
+    report_test_result("test_long_gedcom_line", test_result);
     total_tests++;
-    total_passed += run_test("test_long_gedcom_line", test_long_gedcom_line);
+    total_passed += test_result;
+    test_result = test_rejects_overflowing_gedcom_level();
+    report_test_result("test_rejects_overflowing_gedcom_level", test_result);
     total_tests++;
-    total_passed += run_test("test_rejects_overflowing_gedcom_level",
-                             test_rejects_overflowing_gedcom_level);
+    total_passed += test_result;
+    test_result = test_rejects_excessive_gedcom_level();
+    report_test_result("test_rejects_excessive_gedcom_level", test_result);
     total_tests++;
-    total_passed += run_test("test_rejects_excessive_gedcom_level",
-                             test_rejects_excessive_gedcom_level);
+    total_passed += test_result;
+    test_result = test_rejects_malformed_gedcom_level();
+    report_test_result("test_rejects_malformed_gedcom_level", test_result);
     total_tests++;
-    total_passed += run_test("test_rejects_malformed_gedcom_level",
-                             test_rejects_malformed_gedcom_level);
+    total_passed += test_result;
+    test_result = test_memory_allocation_error();
+    report_test_result("test_memory_allocation_error", test_result);
     total_tests++;
-    total_passed +=
-        run_test("test_memory_allocation_error", test_memory_allocation_error);
+    total_passed += test_result;
+    test_result = test_empty_filename();
+    report_test_result("test_empty_filename", test_result);
     total_tests++;
-    total_passed += run_test("test_empty_filename", test_empty_filename);
+    total_passed += test_result;
+    test_result = test_orphan_citation();
+    report_test_result("test_orphan_citation", test_result);
     total_tests++;
-    total_passed += run_test("test_orphan_citation", test_orphan_citation);
+    total_passed += test_result;
+    test_result = test_extracts_repository_links();
+    report_test_result("test_extracts_repository_links", test_result);
     total_tests++;
-    total_passed += run_test("test_extracts_repository_links",
-                             test_extracts_repository_links);
+    total_passed += test_result;
+    test_result = test_extracts_source_record_excerpt();
+    report_test_result("test_extracts_source_record_excerpt", test_result);
     total_tests++;
-    total_passed += run_test("test_extracts_source_record_excerpt",
-                             test_extracts_source_record_excerpt);
+    total_passed += test_result;
+    test_result = test_extracts_citation_excerpt();
+    report_test_result("test_extracts_citation_excerpt", test_result);
     total_tests++;
-    total_passed += run_test("test_extracts_citation_excerpt",
-                             test_extracts_citation_excerpt);
+    total_passed += test_result;
+    test_result = test_extracts_orphan_citation_excerpt();
+    report_test_result("test_extracts_orphan_citation_excerpt", test_result);
     total_tests++;
-    total_passed += run_test("test_extracts_orphan_citation_excerpt",
-                             test_extracts_orphan_citation_excerpt);
+    total_passed += test_result;
+    test_result = test_extracts_repository_excerpt();
+    report_test_result("test_extracts_repository_excerpt", test_result);
     total_tests++;
-    total_passed += run_test("test_extracts_repository_excerpt",
-                             test_extracts_repository_excerpt);
+    total_passed += test_result;
     printf("Tests terminés. Résultat: %d/%d réussis.\n", total_passed,
            total_tests);
 

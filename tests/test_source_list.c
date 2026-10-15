@@ -1,18 +1,9 @@
 #include "source_list.h"
 #include "string_utils.h"
+#include "test_reporter.h"
 
 #include <stdio.h>
 #include <string.h>
-
-/* Helpers de test */
-
-/* Exécute un test et rapporte son résultat sous son nom. */
-static int run_test(const char *test_name, int (*test_function)(void)) {
-    int passed = test_function();
-
-    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
-    return passed;
-}
 
 /* Vérifie que l'initialisation crée une liste vide. */
 static int test_initial_state(void) {
@@ -198,16 +189,26 @@ static int test_free_resets_list(void) {
 int main(void) {
     const int total_tests = 6;
     int passed_tests = 0;
+    int test_result;
 
-    passed_tests += run_test("test_initial_state", test_initial_state);
-    passed_tests += run_test("test_rejects_null_list", test_rejects_null_list);
-    passed_tests += run_test("test_rejects_missing_description",
-                             test_rejects_missing_description);
-    passed_tests +=
-        run_test("test_grows_and_stores_values", test_grows_and_stores_values);
-    passed_tests += run_test("test_cleans_up_after_allocation_failure",
-                             test_cleans_up_after_allocation_failure);
-    passed_tests += run_test("test_free_resets_list", test_free_resets_list);
+    test_result = test_initial_state();
+    report_test_result("test_initial_state", test_result);
+    passed_tests += test_result;
+    test_result = test_rejects_null_list();
+    report_test_result("test_rejects_null_list", test_result);
+    passed_tests += test_result;
+    test_result = test_rejects_missing_description();
+    report_test_result("test_rejects_missing_description", test_result);
+    passed_tests += test_result;
+    test_result = test_grows_and_stores_values();
+    report_test_result("test_grows_and_stores_values", test_result);
+    passed_tests += test_result;
+    test_result = test_cleans_up_after_allocation_failure();
+    report_test_result("test_cleans_up_after_allocation_failure", test_result);
+    passed_tests += test_result;
+    test_result = test_free_resets_list();
+    report_test_result("test_free_resets_list", test_result);
+    passed_tests += test_result;
 
     printf("Résultat source_list: %d/%d réussis.\n", passed_tests, total_tests);
     return passed_tests == total_tests ? 0 : 1;

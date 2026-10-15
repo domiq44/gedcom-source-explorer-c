@@ -1,17 +1,8 @@
 #include "repository_list.h"
+#include "test_reporter.h"
 
 #include <stdio.h>
 #include <string.h>
-
-/* Helpers de test */
-
-/* Exécute un test et rapporte son résultat sous son nom. */
-static int run_test(const char *test_name, int (*test_function)(void)) {
-    int passed = test_function();
-
-    printf("[%s] %s\n", passed ? "PASS" : "FAIL", test_name);
-    return passed;
-}
 
 /* Vérifie l'état initial d'une liste de dépôts. */
 static int test_initial_state(void) {
@@ -185,17 +176,29 @@ static int test_free_resets_list(void) {
 int main(void) {
     const int total = 7;
     int passed = 0;
+    int test_result;
 
-    passed += run_test("test_initial_state", test_initial_state);
-    passed += run_test("test_add_repository", test_add_repository);
-    passed +=
-        run_test("test_updates_repository_name", test_updates_repository_name);
-    passed += run_test("test_adds_repository_link", test_adds_repository_link);
-    passed +=
-        run_test("test_rejects_null_reference", test_rejects_null_reference);
-    passed += run_test("test_rejects_unknown_repository_name",
-                       test_rejects_unknown_repository_name);
-    passed += run_test("test_free_resets_list", test_free_resets_list);
+    test_result = test_initial_state();
+    report_test_result("test_initial_state", test_result);
+    passed += test_result;
+    test_result = test_add_repository();
+    report_test_result("test_add_repository", test_result);
+    passed += test_result;
+    test_result = test_updates_repository_name();
+    report_test_result("test_updates_repository_name", test_result);
+    passed += test_result;
+    test_result = test_adds_repository_link();
+    report_test_result("test_adds_repository_link", test_result);
+    passed += test_result;
+    test_result = test_rejects_null_reference();
+    report_test_result("test_rejects_null_reference", test_result);
+    passed += test_result;
+    test_result = test_rejects_unknown_repository_name();
+    report_test_result("test_rejects_unknown_repository_name", test_result);
+    passed += test_result;
+    test_result = test_free_resets_list();
+    report_test_result("test_free_resets_list", test_result);
+    passed += test_result;
 
     return passed == total ? 0 : 1;
 }
