@@ -197,13 +197,14 @@ make test
 ```
 
 Les tests C n'ont pas besoin de Node.js ni de npm. Pour préparer les tests
-navigateur sous Fedora (y compris Fedora 44), lance le script suivant :
+navigateur sous Fedora (y compris Fedora 44), lance :
 
 ```bash
-bash scripts/setup-browser-tests.sh
+make setup-browser-tests
 ```
 
-Il installe uniquement les dépendances des tests navigateur : Python 3, les
+Cette cible lance `scripts/setup-browser-tests.sh`. Le script installe uniquement
+les dépendances des tests navigateur : Python 3, les
 bibliothèques système de Chromium, Node.js/npm si une version compatible n'est
 pas déjà disponible, puis Playwright et Chromium. Il peut demander le mot de
 passe `sudo` et nécessite une connexion Internet. Les outils C restent à

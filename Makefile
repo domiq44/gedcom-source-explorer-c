@@ -36,7 +36,8 @@ LIB_SOURCES = $(SRC_DIR)/gedcom_parser.c $(SRC_DIR)/gedcom_context.c $(SRC_DIR)/
 APP_SOURCES = $(LIB_SOURCES) $(SRC_DIR)/html_report.c
 MAIN_SOURCE = $(SRC_DIR)/main.c
 
-.PHONY: all run report test test-browser dist format lint cppcheck clean clean-build clean-browser clean-all
+.PHONY: all run report test test-browser setup-browser-tests dist format lint \
+	cppcheck clean clean-build clean-browser clean-all
 
 all: $(TARGET)
 
@@ -89,7 +90,14 @@ test: $(TEST_TARGETS)
 	done; \
 	exit $$status
 
+setup-browser-tests:
+	bash scripts/setup-browser-tests.sh
+
 test-browser: $(TARGET) $(BROWSER_TEST_GEDCOM) $(WEB_DIR)/report.html $(WEB_DIR)/report.css $(WEB_DIR)/report.js
+	@if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then \
+		printf '%s\n' "Node.js et npm sont requis. Sur Fedora, lancez 'make setup-browser-tests'."; \
+		exit 127; \
+	fi
 	mkdir -p $(BROWSER_TEST_DIR)
 	cp $(WEB_DIR)/report.css $(WEB_DIR)/report.js $(BROWSER_TEST_DIR)/
 	./$(TARGET) --html "$(BROWSER_TEST_GEDCOM)" "$(BROWSER_REPORT_HTML)"
