@@ -21,6 +21,7 @@ static int test_initial_state(void) {
 
     /* When */
     init_repository_list(&repositories);
+
     /* Then */
     if (repositories.repositories == NULL &&
         repositories.count == expected_count &&
@@ -44,8 +45,9 @@ static int test_add_repository(void) {
     RepositoryList repositories;
     int passed;
 
-    /* When */
     init_repository_list(&repositories);
+
+    /* When */
     passed =
         repository_list_add(&repositories, expected_reference, expected_name);
 
@@ -66,9 +68,10 @@ static int test_updates_repository_name(void) {
     RepositoryList repositories;
     int update_result;
 
-    /* When */
     init_repository_list(&repositories);
     repository_list_add(&repositories, "@R2@", "Nom temporaire");
+
+    /* When */
     update_result =
         repository_list_set_name(&repositories, "@R2@", expected_name);
 
@@ -90,9 +93,10 @@ static int test_adds_repository_link(void) {
     RepositoryList repositories;
     int added;
 
-    /* When */
     init_repository_list(&repositories);
     repository_list_add(&repositories, "@R1@", "Archives");
+
+    /* When */
     added = repository_list_add_link(&repositories, expected_source_reference,
                                      expected_repository_reference,
                                      expected_context);
@@ -115,14 +119,14 @@ static int test_rejects_null_reference(void) {
     RepositoryList repositories;
     int add_result;
 
-    /* When */
     init_repository_list(&repositories);
+
+    /* When */
     add_result = repository_list_add(&repositories, NULL, "Nom");
 
     /* Then */
     free_repository_list(&repositories);
     if (add_result == expected_add_result) {
-        printf("[PASS] Rejet d'une référence NULL\n");
         return 1;
     }
     printf("[FAIL] Rejet d'une référence NULL\n");
@@ -136,14 +140,14 @@ static int test_rejects_unknown_repository_name(void) {
     RepositoryList repositories;
     int update_result;
 
-    /* When */
     init_repository_list(&repositories);
+
+    /* When */
     update_result = repository_list_set_name(&repositories, "@R3@", "Inconnu");
 
     /* Then */
     free_repository_list(&repositories);
     if (update_result == expected_update_result) {
-        printf("[PASS] Rejet de la mise à jour d'un dépôt inconnu\n");
         return 1;
     }
     printf("[FAIL] Rejet de la mise à jour d'un dépôt inconnu\n");
@@ -158,9 +162,10 @@ static int test_free_resets_list(void) {
     RepositoryList repositories;
     int add_result;
 
-    /* When */
     init_repository_list(&repositories);
     add_result = repository_list_add(&repositories, "@R1@", "Archives");
+
+    /* When */
     free_repository_list(&repositories);
 
     /* Then */
@@ -173,7 +178,6 @@ static int test_free_resets_list(void) {
         printf("[FAIL] Libération et remise à zéro de la liste\n");
         return 0;
     }
-    printf("[PASS] Libération et remise à zéro de la liste\n");
     return 1;
 }
 
@@ -193,9 +197,5 @@ int main(void) {
                        test_rejects_unknown_repository_name);
     passed += run_test("test_free_resets_list", test_free_resets_list);
 
-    if (passed) {
-        printf("[PASS] Initialisation, ajout, nom et libération de "
-               "RepositoryList\n");
-    }
     return passed == total ? 0 : 1;
 }

@@ -33,95 +33,29 @@ static TestResult run_result_test(const char *test_name,
     return result;
 }
 
-/**
- * @brief Teste l'égalité de deux chaînes de caractères.
- * @param actual La chaîne résultante.
- * @param expected La chaîne attendue.
- * @param test_name Nom du test.
- * @return int 1 si succès, 0 si échec.
- */
-static int assert_string_equal(const char *actual, const char *expected,
-                               const char *test_name) {
-    if (actual == NULL || expected == NULL) {
-        printf("[FAIL] %s - Erreur de NULL dans les entrées.\n", test_name);
-        return 0;
-    }
-    if (strcmp(actual, expected) == 0) {
-        printf("[PASS] %s\n", test_name);
-        return 1;
-    } else {
-        printf("[FAIL] %s - Attendu: '%s', Obtenu: '%s'\n", test_name, expected,
-               actual);
-        return 0;
-    }
-}
-
-/**
- * @brief Teste le comportement de la fonction parse_gedcom.
- * @param filename Le fichier à tester.
- * @param expected_count Le nombre attendu de sources.
- * @return int 1 si le test passe, 0 sinon.
- */
-static int run_parser_test(const char *filename, int expected_count) {
-    /* Given */
-    const int expected_parse_result = 0;
-    SourceList sources;
-    RepositoryList repositories;
-    init_source_list(&sources);
-    init_repository_list(&repositories);
-    int passed = 0;
-
-    /* When */
-    int result = parse_gedcom(filename, &sources, &repositories);
-
-    /* Then */
-    if (result == expected_parse_result) {
-        if ((int)sources.count == expected_count) {
-            static const char *expected_values[] = {"@S1@", "@S2@", "@S3@"};
-            int values_ok = 1;
-            size_t i;
-
-            for (i = 0U; i < (size_t)expected_count && i < 3U; i++) {
-                values_ok &= assert_string_equal(
-                    sources.sources[i].description, expected_values[i],
-                    "Vérification de la source extraite");
-            }
-
-            if (values_ok) {
-                printf("[PASS] Nombre de sources correct (%d) pour '%s'.\n",
-                       expected_count, filename);
-                passed = 1;
-            } else {
-                printf("[FAIL] Valeurs de sources incohérentes pour '%s'.\n",
-                       filename);
-            }
-        } else {
-            printf("[FAIL] Nombre de sources incorrect pour '%s'. Attendu: %d, "
-                   "Obtenu: %zu.\n",
-                   filename, expected_count, sources.count);
-        }
-    } else {
-        printf("[FAIL] parse_gedcom a retourné une erreur (%d) pour '%s'.\n",
-               result, filename);
-    }
-
-    free_source_list(&sources);
-    free_repository_list(&repositories);
-    return passed;
-}
-
-/* Prépare un fichier à niveau invalide et vérifie son diagnostic. */
-static int rejects_invalid_gedcom_level(
-    InvalidGedcomLevelCase test_case, int expected_parse_failure,
-    GedcomParseErrorCode expected_error_code, size_t expected_error_line) {
-    FILE *file = fopen(test_case.filename, "w");
-    SourceList sources;
-    RepositoryList repositories;
-    GedcomParseError error;
+/* Écrit une fixture et garantit sa fermeture avant le test. */
+static int write_text_fixture(const char *filename, const char *contents) {
+    FILE *file = fopen(filename, "w");
     int write_status;
     int close_status;
-    int parse_status;
-    int rejected;
+
+    if (file == NULL) {
+        return 0;
+    }
+    write_status = fputs(contents, file);
+    close_status = fclose(file);
+    if (write_status == EOF || close_status != 0) {
+        remove(filename);
+        return 0;
+    }
+    return 1;
+}
+
+/* Écrit la fixture commune aux tests de niveaux invalides. */
+static int write_invalid_level_fixture(InvalidGedcomLevelCase test_case) {
+    FILE *file = fopen(test_case.filename, "w");
+    int write_status;
+    int close_status;
 
     if (file == NULL) {
         return 0;
@@ -135,18 +69,7 @@ static int rejects_invalid_gedcom_level(
         remove(test_case.filename);
         return 0;
     }
-
-    init_source_list(&sources);
-    init_repository_list(&repositories);
-    parse_status = parse_gedcom_with_error(test_case.filename, &sources,
-                                           &repositories, &error);
-    rejected = (parse_status != 0) == expected_parse_failure &&
-               error.code == expected_error_code &&
-               error.line_number == expected_error_line;
-    free_source_list(&sources);
-    free_repository_list(&repositories);
-    remove(test_case.filename);
-    return rejected;
+    return 1;
 }
 
 static const char repository_records_fixture[] =
@@ -175,33 +98,17 @@ static const char repository_records_fixture[] =
     "1 NAME Le Bistrot du Coin\n"
     "0 TRLR\n";
 
-/* Parse une fixture de dépôts dans des listes neuves. */
-static int parse_repository_fixture(const char *filename, SourceList *sources,
-                                    RepositoryList *repositories) {
-    FILE *file;
-    int write_status;
-    int close_status;
-    int parse_status = -1;
-
-    init_source_list(sources);
-    init_repository_list(repositories);
-    file = fopen(filename, "w");
-    if (file == NULL) {
-        return parse_status;
-    }
-    write_status = fputs(repository_records_fixture, file);
-    close_status = fclose(file);
-    if (write_status != EOF && close_status == 0) {
-        parse_status = parse_gedcom(filename, sources, repositories);
-    }
-    remove(filename);
-    return parse_status;
+/* Écrit la fixture commune aux tests des liens et extraits. */
+static int write_repository_fixture(const char *filename) {
+    return write_text_fixture(filename, repository_records_fixture);
 }
 
 /* Vérifie l'extraction des entités SOUR d'une fixture GEDCOM. */
 static int test_embedded_parser_fixture(void) {
     /* Given */
-    const int expected_source_count = 3;
+    const int expected_parse_result = 0;
+    const size_t expected_source_count = 3U;
+    static const char *expected_descriptions[] = {"@S1@", "@S2@", "@S3@"};
     static const char fixture[] = "0 HEAD\n"
                                   "1 CHAR ANSI\n"
                                   "0 @S1@ SOUR\n"
@@ -209,70 +116,59 @@ static int test_embedded_parser_fixture(void) {
                                   "0 @S3@ SOUR\n"
                                   "0 TRLR\n";
     const char *filename = "tmp_parser_input.ged";
-    FILE *file = fopen(filename, "w");
+    SourceList sources;
+    RepositoryList repositories;
+    int fixture_written;
+    int parse_result = -1;
     int passed;
 
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_text_fixture(filename, fixture);
+
     /* When */
-    if (file == NULL) {
-        printf("[FAIL] Impossible de créer le fichier temporaire du test "
-               "parser.\n");
-        return 0;
-    }
-
-    if (fputs(fixture, file) == EOF) {
-        printf("[FAIL] Impossible d'écrire la fixture GEDCOM temporaire.\n");
-        fclose(file);
-        remove(filename);
-        return 0;
-    }
-
-    if (fclose(file) != 0) {
-        printf("[FAIL] Impossible de fermer la fixture GEDCOM temporaire.\n");
-        remove(filename);
-        return 0;
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
     }
 
     /* Then */
-    passed = run_parser_test(filename, expected_source_count);
+    passed =
+        fixture_written && parse_result == expected_parse_result &&
+        sources.count == expected_source_count &&
+        strcmp(sources.sources[0].description, expected_descriptions[0]) == 0 &&
+        strcmp(sources.sources[1].description, expected_descriptions[1]) == 0 &&
+        strcmp(sources.sources[2].description, expected_descriptions[2]) == 0;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
     remove(filename);
     return passed;
 }
 
-/**
- * @brief Teste l'isolation des ressources (cleanup).
- * @param filename Le fichier à tester.
- * @return int 1 si le test passe, 0 sinon.
- */
 /* Vérifie qu'un fichier absent produit une erreur d'ouverture. */
 static int test_file_not_found(void) {
     /* Given */
     const GedcomParseErrorCode expected_error_code = GEDCOM_PARSE_ERROR_OPEN;
     const size_t expected_line_number = 0U;
     const char *filename = "non_existent_file_xyz.ged";
-    printf("\n--- Test Fichier Inexistant ---\n");
     SourceList sources;
     RepositoryList repositories;
     GedcomParseError error;
+    int parse_result;
+    int passed;
+
     init_source_list(&sources);
     init_repository_list(&repositories);
+
     /* When */
-    int result =
+    parse_result =
         parse_gedcom_with_error(filename, &sources, &repositories, &error);
 
     /* Then */
-    if (result != 0 && error.code == expected_error_code &&
-        error.line_number == expected_line_number) {
-        printf("[PASS] Détection d'erreur de fichier inexistant réussie.\n");
-        free_source_list(&sources);
-        free_repository_list(&repositories);
-        return 1;
-    } else {
-        printf("[FAIL] parse_gedcom n'a pas signalé l'erreur de fichier "
-               "inexistant.\n");
-        free_source_list(&sources);
-        free_repository_list(&repositories);
-        return 0;
-    }
+    passed = parse_result != 0 && error.code == expected_error_code &&
+             error.line_number == expected_line_number;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    return passed;
 }
 
 /* Vérifie qu'un fichier GEDCOM vide est accepté sans résultat. */
@@ -281,40 +177,26 @@ static int test_empty_gedcom_file(void) {
     const int expected_parse_result = 0;
     const size_t expected_source_count = 0U;
     const size_t expected_repository_count = 0U;
-    printf("\n--- Test Fichier GEDCOM Vide ---\n");
-
     const char *filename = "tmp_empty_gedcom.ged";
-    FILE *file = fopen(filename, "w");
-    if (file == NULL) {
-        printf("[FAIL] Impossible de créer le fichier GEDCOM vide.\n");
-        return 0;
-    }
-
-    if (fclose(file) != 0) {
-        printf("[FAIL] Impossible de fermer le fichier GEDCOM vide.\n");
-        remove(filename);
-        return 0;
-    }
-
     SourceList sources;
     RepositoryList repositories;
+    int fixture_written;
+    int parse_result = -1;
+    int passed;
+
     init_source_list(&sources);
     init_repository_list(&repositories);
+    fixture_written = write_text_fixture(filename, "");
+
     /* When */
-    int result = parse_gedcom(filename, &sources, &repositories);
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
 
     /* Then */
-    int passed = result == expected_parse_result &&
-                 sources.count == expected_source_count &&
-                 repositories.count == expected_repository_count;
-
-    if (passed) {
-        printf("[PASS] Un fichier vide est accepté sans source.\n");
-    } else {
-        printf("[FAIL] Résultat inattendu pour un fichier vide (code %d, %zu "
-               "sources).\n",
-               result, sources.count);
-    }
+    passed = fixture_written && parse_result == expected_parse_result &&
+             sources.count == expected_source_count &&
+             repositories.count == expected_repository_count;
 
     free_source_list(&sources);
     free_repository_list(&repositories);
@@ -333,56 +215,44 @@ static int test_false_positive_tag_detection(void) {
     const int expected_parse_result = 0;
     const char *expected_first_description = "@S1@";
     const char *expected_second_description = "Source Name";
-    printf("\n--- Test Faux Positif de Tag ---\n");
-
     const char *filename = "tmp_false_positive.ged";
-    FILE *file = fopen(filename, "w");
-    if (file == NULL) {
-        printf(
-            "[FAIL] Impossible de créer le fichier de test de faux positif.\n");
-        return 0;
-    }
-
-    fputc(0xEF, file);
-    fputc(0xBB, file);
-    fputc(0xBF, file);
-    fprintf(file, "0 HEAD\n");
-    fprintf(file, "1 SOUR unregistered\n");
-    fprintf(file, "1 NOTE SOUR should be ignored because it is just text\n");
-    fprintf(file, "0 @I1@ INDI\n");
-    fprintf(file, "1 SOUR @S1@\n");
-    fprintf(file, "0 @I2@ INDI\n");
-    fprintf(file, "1 SOUR Source Name\n");
-    fprintf(file, "0 TRLR\n");
-    fclose(file);
-
+    static const char fixture[] = "\xEF\xBB\xBF"
+                                  "0 HEAD\n"
+                                  "1 SOUR unregistered\n"
+                                  "1 NOTE SOUR should be ignored because it "
+                                  "is just text\n"
+                                  "0 @I1@ INDI\n"
+                                  "1 SOUR @S1@\n"
+                                  "0 @I2@ INDI\n"
+                                  "1 SOUR Source Name\n"
+                                  "0 TRLR\n";
     SourceList sources;
     RepositoryList repositories;
+    int fixture_written;
+    int parse_result = -1;
+    int passed;
+
     init_source_list(&sources);
     init_repository_list(&repositories);
+    fixture_written = write_text_fixture(filename, fixture);
+
     /* When */
-    int result = parse_gedcom(filename, &sources, &repositories);
-    int ok = 0;
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
 
     /* Then */
-    if (result == expected_parse_result &&
-        sources.count == expected_source_count &&
-        strcmp(sources.sources[0].description, expected_first_description) ==
-            0 &&
-        strcmp(sources.sources[1].description, expected_second_description) ==
-            0) {
-        ok = 1;
-        printf("[PASS] Détection exacte du tag SOUR sans faux positif.\n");
-    } else {
-        printf("[FAIL] Faux positif détecté ou compteur incorrect. Attendu: 2 "
-               "sources, obtenu: %zu.\n",
-               sources.count);
-    }
+    passed = fixture_written && parse_result == expected_parse_result &&
+             sources.count == expected_source_count &&
+             strcmp(sources.sources[0].description,
+                    expected_first_description) == 0 &&
+             strcmp(sources.sources[1].description,
+                    expected_second_description) == 0;
 
     free_source_list(&sources);
     free_repository_list(&repositories);
     remove(filename);
-    return ok;
+    return passed;
 }
 
 /* Vérifie la distinction entre entité source et citation avec contexte. */
@@ -395,55 +265,43 @@ static int test_source_entity_and_citation_context(void) {
     const char *expected_reference = "@S1@";
     const char *expected_title = "Source principale";
     const char *expected_context = "@I1@ INDI";
-    printf("\n--- Test Entité Source et Citation ---\n");
-
     const char *filename = "tmp_source_citation.ged";
-    FILE *file = fopen(filename, "w");
-    if (file == NULL) {
-        printf("[FAIL] Impossible de créer le fichier de test d'entité et de "
-               "citation.\n");
-        return 0;
-    }
-
-    fprintf(file, "0 @S1@ SOUR\n");
-    fprintf(file, "1 TITL Source principale\n");
-    fprintf(file, "0 @I1@ INDI\n");
-    fprintf(file, "1 NAME Jean /DOE/\n");
-    fprintf(file, "1 SOUR @S1@\n");
-    fprintf(file, "0 TRLR\n");
-    fclose(file);
-
+    static const char fixture[] = "0 @S1@ SOUR\n"
+                                  "1 TITL Source principale\n"
+                                  "0 @I1@ INDI\n"
+                                  "1 NAME Jean /DOE/\n"
+                                  "1 SOUR @S1@\n"
+                                  "0 TRLR\n";
     SourceList sources;
     RepositoryList repositories;
+    int fixture_written;
+    int parse_result = -1;
+    int passed;
+
     init_source_list(&sources);
     init_repository_list(&repositories);
+    fixture_written = write_text_fixture(filename, fixture);
+
     /* When */
-    int result = parse_gedcom(filename, &sources, &repositories);
-    int ok = 0;
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
 
     /* Then */
-    if (result == expected_parse_result &&
-        sources.count == expected_source_count &&
-        strcmp(sources.sources[0].kind, expected_entity_kind) == 0 &&
-        strcmp(sources.sources[0].reference, expected_reference) == 0 &&
-        sources.sources[0].title != NULL &&
-        strcmp(sources.sources[0].title, expected_title) == 0 &&
-        strcmp(sources.sources[1].kind, expected_citation_kind) == 0 &&
-        strcmp(sources.sources[1].reference, expected_reference) == 0 &&
-        strcmp(sources.sources[1].context, expected_context) == 0) {
-        ok = 1;
-        printf("[PASS] Distinction entre entité source et citation avec "
-               "contexte.\n");
-    } else {
-        printf(
-            "[FAIL] Entité/citation/context incorrects. Obtenu: %zu entrées.\n",
-            sources.count);
-    }
+    passed = fixture_written && parse_result == expected_parse_result &&
+             sources.count == expected_source_count &&
+             strcmp(sources.sources[0].kind, expected_entity_kind) == 0 &&
+             strcmp(sources.sources[0].reference, expected_reference) == 0 &&
+             sources.sources[0].title != NULL &&
+             strcmp(sources.sources[0].title, expected_title) == 0 &&
+             strcmp(sources.sources[1].kind, expected_citation_kind) == 0 &&
+             strcmp(sources.sources[1].reference, expected_reference) == 0 &&
+             strcmp(sources.sources[1].context, expected_context) == 0;
 
     free_source_list(&sources);
     free_repository_list(&repositories);
     remove(filename);
-    return ok;
+    return passed;
 }
 
 /* Vérifie le contexte direct d'une citation GEDCOM imbriquée. */
@@ -460,47 +318,31 @@ static int test_nested_citation_context(void) {
                                   "3 PAGE 12\n"
                                   "0 TRLR\n";
     const char *filename = "tmp_nested_citation_context.ged";
-    FILE *file = fopen(filename, "w");
-    int write_status;
-    int close_status;
-    int ok = 0;
-
-    if (file == NULL) {
-        printf("[FAIL] Impossible de créer le fichier de contexte imbriqué.\n");
-        return 0;
-    }
-    write_status = fputs(fixture, file);
-    close_status = fclose(file);
-    if (write_status == EOF || close_status != 0) {
-        printf("[FAIL] Impossible d'écrire le fichier de contexte imbriqué.\n");
-        remove(filename);
-        return 0;
-    }
-
     SourceList sources;
     RepositoryList repositories;
+    int fixture_written;
+    int parse_result = -1;
+    int passed;
+
     init_source_list(&sources);
     init_repository_list(&repositories);
+    fixture_written = write_text_fixture(filename, fixture);
+
     /* When */
-    int parse_result = parse_gedcom(filename, &sources, &repositories);
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
 
     /* Then */
-    if (parse_result == expected_parse_result &&
-        sources.count == expected_source_count &&
-        strcmp(sources.sources[0].context, expected_context) == 0 &&
-        strstr(sources.sources[0].gedcom.text, expected_excerpt) != NULL) {
-        ok = 1;
-        printf(
-            "[PASS] Le contexte imbriqué utilise le parent GEDCOM direct.\n");
-    } else {
-        printf("[FAIL] Le contexte imbriqué ne correspond pas au parent GEDCOM "
-               "direct.\n");
-    }
+    passed = fixture_written && parse_result == expected_parse_result &&
+             sources.count == expected_source_count &&
+             strcmp(sources.sources[0].context, expected_context) == 0 &&
+             strstr(sources.sources[0].gedcom.text, expected_excerpt) != NULL;
 
     free_source_list(&sources);
     free_repository_list(&repositories);
     remove(filename);
-    return ok;
+    return passed;
 }
 
 /* Vérifie qu'une erreur de lecture est distinguée d'une fin de fichier. */
@@ -539,7 +381,6 @@ static TestResult test_read_error(void) {
     /* Then */
     if ((result != 0) == expected_parse_failure &&
         error.code == expected_error_code) {
-        printf("[PASS] Une erreur de lecture est signalée au lieu d'un EOF.\n");
         return TEST_PASSED;
     }
     printf("[FAIL] Une erreur de lecture a été traitée comme une fin de "
@@ -557,60 +398,40 @@ static int test_long_gedcom_line(void) {
     /* Given */
     const size_t expected_source_count = 1U;
     const int expected_parse_result = 0;
-    printf("\n--- Test Ligne GEDCOM Très Long ---\n");
-
     const char *filename = "tmp_long_line.ged";
-    FILE *file = fopen(filename, "w");
     char long_title[4096];
+    char fixture[4200];
     size_t index;
-    int ok = 0;
-
-    if (file == NULL) {
-        printf(
-            "[FAIL] Impossible de créer le fichier de test de ligne longue.\n");
-        return 0;
-    }
+    SourceList sources;
+    RepositoryList repositories;
+    int fixture_written;
+    int parse_result = -1;
+    int passed;
 
     for (index = 0U; index < sizeof(long_title) - 1U; index++) {
         long_title[index] = (index % 10U == 0U) ? 'A' : 'B';
     }
     long_title[sizeof(long_title) - 1U] = '\0';
-
-    fprintf(file, "0 HEAD\n");
-    fprintf(file, "0 @S1@ SOUR\n");
-    fprintf(file, "1 TITL %s\n", long_title);
-    fprintf(file, "0 TRLR\n");
-    fclose(file);
+    snprintf(fixture, sizeof(fixture),
+             "0 HEAD\n0 @S1@ SOUR\n1 TITL %s\n0 TRLR\n", long_title);
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_text_fixture(filename, fixture);
 
     /* When */
-    {
-        SourceList sources;
-        RepositoryList repositories;
-        init_source_list(&sources);
-        init_repository_list(&repositories);
-
-        /* When */
-        int parse_result = parse_gedcom(filename, &sources, &repositories);
-
-        /* Then */
-        if (parse_result == expected_parse_result &&
-            sources.count == expected_source_count &&
-            sources.sources[0].title != NULL &&
-            strcmp(sources.sources[0].title, long_title) == 0) {
-            ok = 1;
-            printf("[PASS] Une ligne GEDCOM longue est conservée sans "
-                   "troncature.\n");
-        } else {
-            printf(
-                "[FAIL] Une ligne GEDCOM longue a été tronquée ou ignorée.\n");
-        }
-
-        free_source_list(&sources);
-        free_repository_list(&repositories);
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
     }
 
+    /* Then */
+    passed = fixture_written && parse_result == expected_parse_result &&
+             sources.count == expected_source_count &&
+             sources.sources[0].title != NULL &&
+             strcmp(sources.sources[0].title, long_title) == 0;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
     remove(filename);
-    return ok;
+    return passed;
 }
 
 /* Vérifie le rejet d'un niveau GEDCOM qui dépasse la capacité numérique. */
@@ -623,14 +444,31 @@ static int test_rejects_overflowing_gedcom_level(void) {
     const InvalidGedcomLevelCase test_case = {
         .filename = "tmp_overflowing_gedcom_level.ged",
         .invalid_line = "999999999999999999999999999999999999 SOUR @S1@\n"};
+    SourceList sources;
+    RepositoryList repositories;
+    GedcomParseError error;
+    int fixture_written;
+    int parse_result = -1;
     int rejected;
 
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_invalid_level_fixture(test_case);
+
     /* When */
-    rejected =
-        rejects_invalid_gedcom_level(test_case, expected_parse_failure,
-                                     expected_error_code, expected_error_line);
+    if (fixture_written) {
+        parse_result = parse_gedcom_with_error(test_case.filename, &sources,
+                                               &repositories, &error);
+    }
 
     /* Then */
+    rejected = fixture_written &&
+               (parse_result != 0) == expected_parse_failure &&
+               error.code == expected_error_code &&
+               error.line_number == expected_error_line;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    remove(test_case.filename);
     return rejected;
 }
 
@@ -644,14 +482,31 @@ static int test_rejects_excessive_gedcom_level(void) {
     const InvalidGedcomLevelCase test_case = {
         .filename = "tmp_excessive_gedcom_level.ged",
         .invalid_line = "100 SOUR @S1@\n"};
+    SourceList sources;
+    RepositoryList repositories;
+    GedcomParseError error;
+    int fixture_written;
+    int parse_result = -1;
     int rejected;
 
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_invalid_level_fixture(test_case);
+
     /* When */
-    rejected =
-        rejects_invalid_gedcom_level(test_case, expected_parse_failure,
-                                     expected_error_code, expected_error_line);
+    if (fixture_written) {
+        parse_result = parse_gedcom_with_error(test_case.filename, &sources,
+                                               &repositories, &error);
+    }
 
     /* Then */
+    rejected = fixture_written &&
+               (parse_result != 0) == expected_parse_failure &&
+               error.code == expected_error_code &&
+               error.line_number == expected_error_line;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    remove(test_case.filename);
     return rejected;
 }
 
@@ -665,14 +520,31 @@ static int test_rejects_malformed_gedcom_level(void) {
     const InvalidGedcomLevelCase test_case = {
         .filename = "tmp_malformed_gedcom_level.ged",
         .invalid_line = "1x SOUR @S1@\n"};
+    SourceList sources;
+    RepositoryList repositories;
+    GedcomParseError error;
+    int fixture_written;
+    int parse_result = -1;
     int rejected;
 
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_invalid_level_fixture(test_case);
+
     /* When */
-    rejected =
-        rejects_invalid_gedcom_level(test_case, expected_parse_failure,
-                                     expected_error_code, expected_error_line);
+    if (fixture_written) {
+        parse_result = parse_gedcom_with_error(test_case.filename, &sources,
+                                               &repositories, &error);
+    }
 
     /* Then */
+    rejected = fixture_written &&
+               (parse_result != 0) == expected_parse_failure &&
+               error.code == expected_error_code &&
+               error.line_number == expected_error_line;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    remove(test_case.filename);
     return rejected;
 }
 
@@ -684,51 +556,33 @@ static int test_memory_allocation_error(void) {
     const int expected_parse_failure = 1;
     static const char fixture[] = "0 @S1@ SOUR\n";
     const char *filename = "tmp_memory_failure.ged";
-    FILE *file = fopen(filename, "w");
-    int write_status;
-    int close_status;
     SourceList sources;
     RepositoryList repositories;
     GedcomParseError error;
-    int result;
-
-    if (file == NULL) {
-        printf("[FAIL] Impossible de créer le fixture d'allocation\n");
-        return 0;
-    }
-    write_status = fputs(fixture, file);
-    close_status = fclose(file);
-    if (write_status == EOF || close_status != 0) {
-        printf("[FAIL] Impossible de créer le fixture d'allocation\n");
-        remove(filename);
-        return 0;
-    }
+    int fixture_written;
+    int parse_result = -1;
+    int passed;
 
     init_source_list(&sources);
     init_repository_list(&repositories);
+    fixture_written = write_text_fixture(filename, fixture);
     string_utils_test_fail_after(0U);
+
     /* When */
-    result = parse_gedcom_with_error(filename, &sources, &repositories, &error);
+    if (fixture_written) {
+        parse_result =
+            parse_gedcom_with_error(filename, &sources, &repositories, &error);
+    }
     string_utils_test_reset_failure();
 
     /* Then */
-    if ((result != 0) == expected_parse_failure &&
-        error.code == expected_error_code &&
-        error.line_number == expected_error_line) {
-        printf("[PASS] Un échec d'allocation est rapporté avec sa ligne.\n");
-    } else {
-        printf("[FAIL] L'échec d'allocation n'est pas diagnostiqué "
-               "correctement.\n");
-        free_source_list(&sources);
-        free_repository_list(&repositories);
-        remove(filename);
-        return 0;
-    }
-
+    passed = fixture_written && (parse_result != 0) == expected_parse_failure &&
+             error.code == expected_error_code &&
+             error.line_number == expected_error_line;
     free_source_list(&sources);
     free_repository_list(&repositories);
     remove(filename);
-    return 1;
+    return passed;
 }
 
 /* Vérifie qu'un chemin GEDCOM vide est rejeté. */
@@ -737,25 +591,20 @@ static int test_empty_filename(void) {
     const int expected_rejected = 1;
     SourceList sources;
     RepositoryList repositories;
+    int parse_result;
     int rejected;
 
-    /* When */
     init_source_list(&sources);
     init_repository_list(&repositories);
-    rejected = parse_gedcom("", &sources, &repositories) != 0;
+
+    /* When */
+    parse_result = parse_gedcom("", &sources, &repositories);
 
     /* Then */
-    if (rejected == expected_rejected) {
-        printf(
-            "[PASS] Une chaîne vide de chemin est rejetée par le parseur.\n");
-        free_source_list(&sources);
-        free_repository_list(&repositories);
-        return 1;
-    }
-    printf("[FAIL] Un chemin vide n'a pas été rejeté par le parseur.\n");
+    rejected = (parse_result != 0) == expected_rejected;
     free_source_list(&sources);
     free_repository_list(&repositories);
-    return 0;
+    return rejected;
 }
 
 /* Vérifie qu'une citation sans source parente est conservée. */
@@ -771,45 +620,26 @@ static int test_orphan_citation(void) {
                                   "0 TRLR\n";
     SourceList sources;
     RepositoryList repositories;
-    FILE *file;
-    int write_status;
-    int close_status;
-    int parse_result;
+    int fixture_written;
+    int parse_result = -1;
     int passed;
 
-    /* When */
     init_source_list(&sources);
     init_repository_list(&repositories);
-    file = fopen(filename, "w");
-    if (file == NULL) {
-        printf("[FAIL] Impossible de créer le fichier de test de citation "
-               "orpheline.\n");
-        free_source_list(&sources);
-        free_repository_list(&repositories);
-        return 0;
+    fixture_written = write_text_fixture(filename, fixture);
+
+    /* When */
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
     }
-    write_status = fputs(fixture, file);
-    close_status = fclose(file);
-    if (write_status == EOF || close_status != 0) {
-        printf("[FAIL] Impossible d'écrire le fichier de test de citation "
-               "orpheline.\n");
-        free_source_list(&sources);
-        free_repository_list(&repositories);
-        remove(filename);
-        return 0;
-    }
-    parse_result = parse_gedcom(filename, &sources, &repositories);
 
     /* Then */
     passed =
-        parse_result == expected_orphan_parse_result &&
+        fixture_written && parse_result == expected_orphan_parse_result &&
         sources.count == expected_orphan_count &&
         strcmp(sources.sources[0].kind, expected_orphan_kind) == 0 &&
         strcmp(sources.sources[0].reference, expected_orphan_reference) == 0;
-    if (passed) {
-        printf("[PASS] Une citation orpheline est conservée sans source "
-               "parente.\n");
-    } else {
+    if (!passed) {
         printf("[FAIL] La citation orpheline est perdue ou mal typée.\n");
     }
 
@@ -837,15 +667,22 @@ static int test_extracts_repository_links(void) {
     const char *filename = "tmp_repository_links.ged";
     SourceList sources;
     RepositoryList repositories;
-    int parse_result;
+    int fixture_written;
+    int parse_result = -1;
     int passed;
 
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_repository_fixture(filename);
+
     /* When */
-    parse_result = parse_repository_fixture(filename, &sources, &repositories);
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
 
     /* Then */
     passed =
-        parse_result == expected_parse_result &&
+        fixture_written && parse_result == expected_parse_result &&
         repositories.count == expected_repository_count &&
         repositories.link_count == expected_link_count &&
         strcmp(repositories.repositories[0].reference,
@@ -868,11 +705,13 @@ static int test_extracts_repository_links(void) {
 
     free_source_list(&sources);
     free_repository_list(&repositories);
+    remove(filename);
     return passed;
 }
 
-/* Vérifie que les extraits de sources et citations restent dans leur record. */
-static int test_extracts_source_excerpts(void) {
+/* Vérifie que l'extrait d'une source inclut ses sous-tags sans l'individu
+ * suivant. */
+static int test_extracts_source_record_excerpt(void) {
     /* Given */
     const int expected_parse_result = 0;
     const size_t expected_source_count = 3U;
@@ -882,23 +721,25 @@ static int test_extracts_source_excerpts(void) {
         "2 CONT Première partie du titre\n";
     const char *expected_repository_media = "3 MEDI Livre\n";
     const char *unexpected_individual_record = "0 @I1@ INDI\n";
-    const char *expected_citation_excerpt =
-        "1 SOUR @S1@\n2 PAGE Page 12\n3 NOTE Mention manuscrite\n";
-    const char *unexpected_second_individual = "0 @I2@ INDI\n";
-    const char *expected_orphan_excerpt =
-        "1 SOUR @S9@\n2 PAGE Référence orpheline\n";
     const char *filename = "tmp_source_excerpts.ged";
     SourceList sources;
     RepositoryList repositories;
-    int parse_result;
+    int fixture_written;
+    int parse_result = -1;
     int passed;
 
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_repository_fixture(filename);
+
     /* When */
-    parse_result = parse_repository_fixture(filename, &sources, &repositories);
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
 
     /* Then */
     passed =
-        parse_result == expected_parse_result &&
+        fixture_written && parse_result == expected_parse_result &&
         sources.count == expected_source_count &&
         strstr(sources.sources[0].gedcom.text, expected_source_start) != NULL &&
         strstr(sources.sources[0].gedcom.text, expected_source_continuation) !=
@@ -907,14 +748,81 @@ static int test_extracts_source_excerpts(void) {
             NULL &&
         strstr(sources.sources[0].gedcom.text, unexpected_individual_record) ==
             NULL &&
-        sources.sources[0].gedcom.length > expected_minimum_excerpt_length &&
-        strstr(sources.sources[1].gedcom.text, expected_citation_excerpt) !=
-            NULL &&
-        strstr(sources.sources[1].gedcom.text, unexpected_second_individual) ==
-            NULL &&
+        sources.sources[0].gedcom.length > expected_minimum_excerpt_length;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    remove(filename);
+    return passed;
+}
+
+/* Vérifie que l'extrait d'une citation s'arrête avant l'individu suivant. */
+static int test_extracts_citation_excerpt(void) {
+    /* Given */
+    const int expected_parse_result = 0;
+    const size_t expected_source_count = 3U;
+    const char *expected_citation_excerpt =
+        "1 SOUR @S1@\n2 PAGE Page 12\n3 NOTE Mention manuscrite\n";
+    const char *unexpected_second_individual = "0 @I2@ INDI\n";
+    const char *filename = "tmp_citation_excerpt.ged";
+    SourceList sources;
+    RepositoryList repositories;
+    int fixture_written;
+    int parse_result = -1;
+    int passed;
+
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_repository_fixture(filename);
+
+    /* When */
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
+
+    /* Then */
+    passed = fixture_written && parse_result == expected_parse_result &&
+             sources.count == expected_source_count &&
+             strstr(sources.sources[1].gedcom.text,
+                    expected_citation_excerpt) != NULL &&
+             strstr(sources.sources[1].gedcom.text,
+                    unexpected_second_individual) == NULL;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    remove(filename);
+    return passed;
+}
+
+/* Vérifie que l'extrait d'une citation orpheline reste dans son record. */
+static int test_extracts_orphan_citation_excerpt(void) {
+    /* Given */
+    const int expected_parse_result = 0;
+    const size_t expected_source_count = 3U;
+    const char *expected_orphan_excerpt =
+        "1 SOUR @S9@\n2 PAGE Référence orpheline\n";
+    const char *filename = "tmp_orphan_excerpt.ged";
+    SourceList sources;
+    RepositoryList repositories;
+    int fixture_written;
+    int parse_result = -1;
+    int passed;
+
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_repository_fixture(filename);
+
+    /* When */
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
+
+    /* Then */
+    passed =
+        fixture_written && parse_result == expected_parse_result &&
+        sources.count == expected_source_count &&
         strstr(sources.sources[2].gedcom.text, expected_orphan_excerpt) != NULL;
     free_source_list(&sources);
     free_repository_list(&repositories);
+    remove(filename);
     return passed;
 }
 
@@ -930,14 +838,21 @@ static int test_extracts_repository_excerpt(void) {
     const char *filename = "tmp_repository_excerpt.ged";
     SourceList sources;
     RepositoryList repositories;
-    int parse_result;
+    int fixture_written;
+    int parse_result = -1;
     int passed;
 
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_repository_fixture(filename);
+
     /* When */
-    parse_result = parse_repository_fixture(filename, &sources, &repositories);
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
 
     /* Then */
-    passed = parse_result == expected_parse_result &&
+    passed = fixture_written && parse_result == expected_parse_result &&
              repositories.count == expected_repository_count &&
              strstr(repositories.repositories[0].gedcom.text,
                     expected_repository_start) != NULL &&
@@ -947,35 +862,12 @@ static int test_extracts_repository_excerpt(void) {
                     unexpected_second_repository) == NULL;
     free_source_list(&sources);
     free_repository_list(&repositories);
+    remove(filename);
     return passed;
-}
-
-/* Vérifie que l'initialisation crée une liste de sources vide. */
-static int test_source_list_initial_state(void) {
-    /* Given */
-    const size_t expected_source_count = 0U;
-    SourceList sources;
-
-    /* When */
-    init_source_list(&sources);
-
-    /* Then */
-    if (sources.count == expected_source_count && sources.sources == NULL) {
-        printf("[PASS] Initialisation de SourceList réussie.\n");
-        free_source_list(&sources);
-        return 1;
-    }
-    printf("[FAIL] Initialisation de SourceList a échoué.\n");
-    free_source_list(&sources);
-    return 0;
 }
 
 /* Exécute l'ensemble des tests unitaires du parseur GEDCOM. */
 int main(void) {
-    printf("==================================================\n");
-    printf("Démarrage des tests unitaires du parser GEDCOM\n");
-    printf("==================================================\n");
-
     int total_passed = 0;
     int total_tests = 0;
     TestResult read_error_result;
@@ -1025,19 +917,19 @@ int main(void) {
     total_passed += run_test("test_extracts_repository_links",
                              test_extracts_repository_links);
     total_tests++;
-    total_passed += run_test("test_extracts_source_excerpts",
-                             test_extracts_source_excerpts);
+    total_passed += run_test("test_extracts_source_record_excerpt",
+                             test_extracts_source_record_excerpt);
+    total_tests++;
+    total_passed += run_test("test_extracts_citation_excerpt",
+                             test_extracts_citation_excerpt);
+    total_tests++;
+    total_passed += run_test("test_extracts_orphan_citation_excerpt",
+                             test_extracts_orphan_citation_excerpt);
     total_tests++;
     total_passed += run_test("test_extracts_repository_excerpt",
                              test_extracts_repository_excerpt);
-    total_tests++;
-    total_passed += run_test("test_source_list_initial_state",
-                             test_source_list_initial_state);
-
-    printf("\n==================================================\n");
     printf("Tests terminés. Résultat: %d/%d réussis.\n", total_passed,
            total_tests);
-    printf("==================================================\n");
 
     return (total_passed == total_tests) ? 0 : 1;
 }

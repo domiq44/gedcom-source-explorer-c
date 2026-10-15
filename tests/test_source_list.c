@@ -27,7 +27,6 @@ static int test_initial_state(void) {
     if (sources.sources == NULL && sources.count == expected_count &&
         sources.capacity == expected_count) {
         free_source_list(&sources);
-        printf("[PASS] Initialisation de la liste\n");
         return 1;
     }
     printf("[FAIL] Initialisation de la liste\n");
@@ -51,7 +50,6 @@ static int test_rejects_null_list(void) {
 
     /* Then */
     if (add_result == expected_add_result) {
-        printf("[PASS] Rejet d'une liste NULL\n");
         return 1;
     }
     printf("[FAIL] Rejet d'une liste NULL\n");
@@ -70,14 +68,14 @@ static int test_rejects_missing_description(void) {
     SourceList sources;
     int add_result;
 
-    /* When */
     init_source_list(&sources);
+
+    /* When */
     add_result = source_list_add(&sources, &invalid_input);
 
     /* Then */
     free_source_list(&sources);
     if (add_result == expected_add_result) {
-        printf("[PASS] Rejet d'une description manquante\n");
         return 1;
     }
     printf("[FAIL] Rejet d'une description manquante\n");
@@ -98,8 +96,9 @@ static int test_grows_and_stores_values(void) {
     size_t index;
     int added_all_sources = 1;
 
-    /* When */
     init_source_list(&sources);
+
+    /* When */
     for (index = 0U; index < expected_source_count; index++) {
         char description[32];
         char reference[32];
@@ -128,7 +127,6 @@ static int test_grows_and_stores_values(void) {
         strcmp(sources.sources[expected_last_index].context,
                expected_context) == 0) {
         free_source_list(&sources);
-        printf("[PASS] Croissance et valeurs stockées dans la liste\n");
         return 1;
     }
     printf("[FAIL] Croissance ou valeurs stockées dans la liste\n");
@@ -152,9 +150,10 @@ static int test_cleans_up_after_allocation_failure(void) {
     int add_result;
     int partial_entry_cleared;
 
-    /* When */
     init_source_list(&sources);
     string_utils_test_fail_after(1U);
+
+    /* When */
     add_result = source_list_add(&sources, &allocation_failure_input);
     string_utils_test_reset_failure();
     partial_entry_cleared =
@@ -167,7 +166,6 @@ static int test_cleans_up_after_allocation_failure(void) {
     /* Then */
     if (add_result == expected_add_result && partial_entry_cleared) {
         free_source_list(&sources);
-        printf("[PASS] Nettoyage après échec d'allocation\n");
         return 1;
     }
     printf("[FAIL] Nettoyage après échec d'allocation\n");
@@ -181,14 +179,15 @@ static int test_free_resets_list(void) {
     const size_t expected_count = 0U;
     SourceList sources;
 
-    /* When */
+    /* Given */
     init_source_list(&sources);
+
+    /* When */
     free_source_list(&sources);
 
     /* Then */
     if (sources.sources == NULL && sources.count == expected_count &&
         sources.capacity == expected_count) {
-        printf("[PASS] Libération et remise à zéro de la liste\n");
         return 1;
     }
     printf("[FAIL] Libération et remise à zéro de la liste\n");

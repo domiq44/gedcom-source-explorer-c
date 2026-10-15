@@ -13,19 +13,6 @@ static int run_test(const char *test_name, int (*test_function)(void)) {
     return passed;
 }
 
-/* Compare le contexte produit à la valeur attendue et affiche le résultat. */
-static int check_context(const char *actual, const char *expected,
-                         const char *test_name) {
-    if (strcmp(actual, expected) == 0) {
-        printf("[PASS] %s\n", test_name);
-        return 1;
-    }
-
-    printf("[FAIL] %s - attendu '%s', obtenu '%s'\n", test_name, expected,
-           actual);
-    return 0;
-}
-
 /* Vérifie le formatage du contexte avec identifiant et tag parent. */
 static int test_context_with_parent_tag(void) {
     /* Given */
@@ -36,7 +23,7 @@ static int test_context_with_parent_tag(void) {
     build_gedcom_context("@I1@", "INDI", "NAME", context, sizeof(context));
 
     /* Then */
-    return check_context(context, expected_context, "Contexte avec tag parent");
+    return strcmp(context, expected_context) == 0;
 }
 
 /* Vérifie le formatage du contexte sans tag parent. */
@@ -49,7 +36,7 @@ static int test_context_without_parent_tag(void) {
     build_gedcom_context("@I1@", "INDI", "", context, sizeof(context));
 
     /* Then */
-    return check_context(context, expected_context, "Contexte sans tag parent");
+    return strcmp(context, expected_context) == 0;
 }
 
 /* Vérifie le contexte de repli quand l'identifiant manque. */
@@ -62,8 +49,7 @@ static int test_context_without_record_identifier(void) {
     build_gedcom_context("", "INDI", "NAME", context, sizeof(context));
 
     /* Then */
-    return check_context(context, expected_context,
-                         "Contexte sans identifiant d'enregistrement");
+    return strcmp(context, expected_context) == 0;
 }
 
 /* Exécute les tests unitaires de construction du contexte GEDCOM. */

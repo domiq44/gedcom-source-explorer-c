@@ -17,21 +17,19 @@ static int run_test(const char *test_name, int (*test_function)(void)) {
 /* Vérifie que xstrdup retourne la valeur attendue. */
 static int test_string_duplication(void) {
     /* Given */
+    const char *input_text = "GEDCOM";
     const char *expected_copy = "GEDCOM";
     char *copy;
+    int is_independent_copy;
 
     /* When */
-    copy = xstrdup(expected_copy);
+    copy = xstrdup(input_text);
 
     /* Then */
-    if (copy != NULL && strcmp(copy, expected_copy) == 0) {
-        free(copy);
-        printf("[PASS] Duplication de chaîne\n");
-        return 1;
-    }
-    printf("[FAIL] Duplication de chaîne\n");
+    is_independent_copy =
+        copy != NULL && copy != input_text && strcmp(copy, expected_copy) == 0;
     free(copy);
-    return 0;
+    return is_independent_copy;
 }
 
 /* Vérifie que trim_whitespace retire les espaces périphériques. */
@@ -45,12 +43,7 @@ static int test_trim_whitespace(void) {
     trimmed_text = trim_whitespace(padded_text);
 
     /* Then */
-    if (strcmp(trimmed_text, expected_trimmed_text) == 0) {
-        printf("[PASS] Suppression des espaces périphériques\n");
-        return 1;
-    }
-    printf("[FAIL] Suppression des espaces périphériques\n");
-    return 0;
+    return strcmp(trimmed_text, expected_trimmed_text) == 0;
 }
 
 /* Vérifie le remplacement d'une chaîne déjà affectée. */
@@ -59,20 +52,18 @@ static int test_string_assignment(void) {
     const char *initial_text = "old value";
     const char *expected_assigned_text = "new value";
     char *assigned;
+    int assigned_expected_text;
+
+    assigned = xstrdup(initial_text);
 
     /* When */
-    assigned = xstrdup(initial_text);
     assign_string(&assigned, expected_assigned_text);
 
     /* Then */
-    if (assigned != NULL && strcmp(assigned, expected_assigned_text) == 0) {
-        printf("[PASS] Remplacement d'une chaîne\n");
-        free(assigned);
-        return 1;
-    }
-    printf("[FAIL] Remplacement d'une chaîne\n");
+    assigned_expected_text =
+        assigned != NULL && strcmp(assigned, expected_assigned_text) == 0;
     free(assigned);
-    return 0;
+    return assigned_expected_text;
 }
 
 /* Vérifie que assign_string efface une valeur lorsque la source est NULL. */
@@ -81,20 +72,17 @@ static int test_string_assignment_clears_null(void) {
     const char *initial_text = "old value";
     const char *expected_cleared_value = NULL;
     char *assigned;
+    int cleared;
+
+    assigned = xstrdup(initial_text);
 
     /* When */
-    assigned = xstrdup(initial_text);
     assign_string(&assigned, NULL);
 
     /* Then */
-    if (assigned == expected_cleared_value) {
-        printf("[PASS] Effacement d'une chaîne avec NULL\n");
-        free(assigned);
-        return 1;
-    }
-    printf("[FAIL] Effacement d'une chaîne avec NULL\n");
+    cleared = assigned == expected_cleared_value;
     free(assigned);
-    return 0;
+    return cleared;
 }
 
 /* Vérifie le retrait du BOM UTF-8 au début d'une chaîne. */
@@ -107,12 +95,7 @@ static int test_strip_utf8_bom(void) {
     strip_utf8_bom(bom_text);
 
     /* Then */
-    if (strcmp(bom_text, expected_bom_text) == 0) {
-        printf("[PASS] Retrait du BOM UTF-8\n");
-        return 1;
-    }
-    printf("[FAIL] Retrait du BOM UTF-8\n");
-    return 0;
+    return strcmp(bom_text, expected_bom_text) == 0;
 }
 
 /* Vérifie qu'une chaîne sans BOM reste inchangée. */
@@ -125,12 +108,7 @@ static int test_strip_utf8_bom_preserves_plain_text(void) {
     strip_utf8_bom(plain_text);
 
     /* Then */
-    if (strcmp(plain_text, expected_plain_text) == 0) {
-        printf("[PASS] Conservation d'une chaîne sans BOM\n");
-        return 1;
-    }
-    printf("[FAIL] Conservation d'une chaîne sans BOM\n");
-    return 0;
+    return strcmp(plain_text, expected_plain_text) == 0;
 }
 
 /* Exécute les tests unitaires des utilitaires de chaînes. */
