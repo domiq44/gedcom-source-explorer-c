@@ -111,16 +111,8 @@ static int is_repository_record(int level, const char *tag,
 }
 
 static int add_entity_source(SourceList *sources, SourceInput source) {
-    char description[MAX_CONTEXT_LENGTH];
-
-    if (source.description == NULL || *source.description == '\0') {
-        snprintf(description, sizeof(description), "%s",
-                 (source.reference != NULL) ? source.reference : "");
-    } else {
-        snprintf(description, sizeof(description), "%s", source.description);
-    }
-
-    source.description = description;
+    if (source.description == NULL || *source.description == '\0')
+        source.description = (source.reference != NULL) ? source.reference : "";
     source.kind = "entity";
     source.context = "entity";
     return source_list_add(sources, &source);
@@ -180,8 +172,8 @@ int parse_gedcom_with_error(const char *filename, SourceList *sources,
         return -1;
     }
 
-    init_source_list(sources);
-    init_repository_list(repositories);
+    free_source_list(sources);
+    free_repository_list(repositories);
 
     file = fopen(filename, "r");
     if (file == NULL) {

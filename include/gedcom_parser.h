@@ -31,8 +31,9 @@ typedef struct {
  * GEDCOM correspondant au tag SOUR et stocke la description associée.
  *
  * @param filename Chemin du fichier GEDCOM à analyser.
- * @param sources Pointeur vers la liste où stocker les résultats.
- * @param repositories Pointeur vers la liste où stocker les dépôts.
+ * @param sources Liste de sortie initialisée avec init_source_list.
+ * @param repositories Liste de sortie initialisée avec init_repository_list.
+ *                    Son contenu est remplacé à chaque appel.
  * @return 0 en cas de succès, -1 en cas d'erreur.
  */
 int parse_gedcom(const char *filename, SourceList *sources,

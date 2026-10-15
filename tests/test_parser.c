@@ -184,6 +184,54 @@ static int test_empty_gedcom_file(void) {
     return passed;
 }
 
+/* Vérifie que l'analyse remplace et libère les résultats précédents. */
+static int test_reuses_output_lists(void) {
+    /* Given */
+    const char *first_filename = "tmp_first_parse.ged";
+    const char *second_filename = "tmp_second_parse.ged";
+    static const char first_fixture[] = "0 @S1@ SOUR\n"
+                                        "1 REPO @R1@\n"
+                                        "0 @R1@ REPO\n"
+                                        "1 NAME Archives\n";
+    const SourceList empty_sources = {0};
+    const RepositoryList empty_repositories = {0};
+    SourceList sources;
+    RepositoryList repositories;
+    int first_fixture_written;
+    int second_fixture_written;
+    int first_parse_result = -1;
+    int second_parse_result = -1;
+    int passed;
+
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    first_fixture_written = write_text_fixture(first_filename, first_fixture);
+    second_fixture_written = write_text_fixture(second_filename, "");
+
+    /* When */
+    if (first_fixture_written && second_fixture_written) {
+        first_parse_result =
+            parse_gedcom(first_filename, &sources, &repositories);
+        second_parse_result =
+            parse_gedcom(second_filename, &sources, &repositories);
+    }
+
+    /* Then */
+    passed = first_fixture_written && second_fixture_written &&
+             first_parse_result == 0 && second_parse_result == 0 &&
+             sources.count == empty_sources.count &&
+             sources.sources == empty_sources.sources &&
+             repositories.count == empty_repositories.count &&
+             repositories.repositories == empty_repositories.repositories &&
+             repositories.link_count == empty_repositories.link_count &&
+             repositories.links == empty_repositories.links;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    remove(first_filename);
+    remove(second_filename);
+    return passed;
+}
+
 /**
  * @brief Vérifie qu'un mot SOUR dans un texte non-taggué n'est pas détecté
  * comme source.
@@ -444,6 +492,39 @@ static int test_long_gedcom_line(void) {
              sources.count == expected_source_count &&
              sources.sources[0].title != NULL &&
              strcmp(sources.sources[0].title, long_title) == 0;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    remove(filename);
+    return passed;
+}
+
+/* Vérifie que la description inline d'une entité SOUR n'est pas tronquée. */
+static int test_long_entity_source_description(void) {
+    /* Given */
+    const char *filename = "tmp_long_source_description.ged";
+    char description[600];
+    char fixture[768];
+    SourceList sources;
+    RepositoryList repositories;
+    int fixture_written;
+    int parse_result = -1;
+    int passed;
+
+    memset(description, 'x', sizeof(description) - 1U);
+    description[sizeof(description) - 1U] = '\0';
+    snprintf(fixture, sizeof(fixture), "0 @S1@ SOUR %s\n", description);
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_text_fixture(filename, fixture);
+
+    /* When */
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
+
+    /* Then */
+    passed = fixture_written && parse_result == 0 && sources.count == 1U &&
+             strcmp(sources.sources[0].description, description) == 0;
     free_source_list(&sources);
     free_repository_list(&repositories);
     remove(filename);
@@ -887,6 +968,7 @@ static const TestCase test_cases[] = {
     {"test_embedded_parser_fixture", test_embedded_parser_fixture},
     {"test_file_not_found", test_file_not_found},
     {"test_empty_gedcom_file", test_empty_gedcom_file},
+    {"test_reuses_output_lists", test_reuses_output_lists},
     {"test_false_positive_tag_detection", test_false_positive_tag_detection},
     {"test_source_entity_and_citation_context",
      test_source_entity_and_citation_context},
@@ -895,6 +977,8 @@ static const TestCase test_cases[] = {
     {"test_nested_citation_context", test_nested_citation_context},
     {"test_read_error", test_read_error},
     {"test_long_gedcom_line", test_long_gedcom_line},
+    {"test_long_entity_source_description",
+     test_long_entity_source_description},
     {"test_rejects_overflowing_gedcom_level",
      test_rejects_overflowing_gedcom_level},
     {"test_rejects_excessive_gedcom_level",
