@@ -218,6 +218,16 @@ Lancer ensuite les tests d'interface :
 make test-browser
 ```
 
+Pour exécuter les suites C avec AddressSanitizer et UndefinedBehaviorSanitizer :
+
+```bash
+make test-sanitize
+```
+
+Cette cible compile des binaires distincts dans `build/sanitize/` et nécessite
+un compilateur prenant en charge ces sanitizers. Elle ne remplace pas les
+binaires normaux de `make test`.
+
 Pour une installation manuelle, Node.js inclut npm; installe Node.js 22 ou
 ultérieur et npm 10 ou ultérieur, puis exécute `npm ci` et
 `npx playwright install chromium`. Le script automatise cette préparation sur

@@ -4,7 +4,8 @@ CLANG_TIDY ?= clang-tidy
 CPPCHECK ?= cppcheck
 LINT_CHECKS ?= clang-analyzer-core.*,bugprone-*,-bugprone-multi-level-implicit-pointer-conversion,performance-*
 CPPCHECK_CHECKS ?= warning,style,performance,portability
-CFLAGS = -Wall -Wextra -g -Iinclude
+CFLAGS = -std=c11 -Wall -Wextra -g -Iinclude
+SANITIZER_FLAGS ?= -fsanitize=address,undefined -fno-omit-frame-pointer
 BUILD_DIR = build
 SRC_DIR = src
 TEST_DIR = tests
@@ -36,7 +37,7 @@ LIB_SOURCES = $(SRC_DIR)/gedcom_parser.c $(SRC_DIR)/gedcom_context.c $(SRC_DIR)/
 APP_SOURCES = $(LIB_SOURCES) $(SRC_DIR)/html_report.c
 MAIN_SOURCE = $(SRC_DIR)/main.c
 
-.PHONY: all run report test test-browser setup-browser-tests dist format lint \
+.PHONY: all run report test test-sanitize test-browser setup-browser-tests dist format lint \
 	cppcheck clean clean-build clean-browser clean-all
 
 all: $(TARGET)
@@ -90,6 +91,10 @@ test: $(TEST_TARGETS)
 	done; \
 	exit $$status
 
+test-sanitize:
+	$(MAKE) BUILD_DIR="$(BUILD_DIR)/sanitize" \
+		CFLAGS="$(CFLAGS) $(SANITIZER_FLAGS)" test
+
 setup-browser-tests:
 	bash scripts/setup-browser-tests.sh
 
@@ -118,7 +123,7 @@ format:
 	$(CLANG_FORMAT) -i -style='{BasedOnStyle: LLVM, IndentWidth: 4}' $(FORMAT_SOURCES)
 
 lint:
-	$(CLANG_TIDY) -quiet -checks='$(LINT_CHECKS)' -warnings-as-errors='*' $(ANALYSIS_SOURCES) -- -std=c11 $(CFLAGS) -DSTRING_UTILS_TESTING
+	$(CLANG_TIDY) -quiet -checks='$(LINT_CHECKS)' -warnings-as-errors='*' $(ANALYSIS_SOURCES) -- $(CFLAGS) -DSTRING_UTILS_TESTING
 
 cppcheck:
 	$(CPPCHECK) --quiet --inline-suppr --enable=$(CPPCHECK_CHECKS) --error-exitcode=1 --language=c --std=c11 -DSTRING_UTILS_TESTING -I include $(ANALYSIS_SOURCES)
