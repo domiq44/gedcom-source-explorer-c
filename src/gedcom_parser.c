@@ -92,6 +92,17 @@ static int is_citation_source_record(int level, const char *tag) {
     return level > 0 && tag != NULL && strcmp(tag, "SOUR") == 0;
 }
 
+static int is_gedcom_pointer(const char *value) {
+    size_t length;
+
+    if (value == NULL || value[0] != '@') {
+        return 0;
+    }
+    length = strlen(value);
+    return length > 2U && value[length - 1U] == '@' &&
+           strchr(value + 1, '@') == value + length - 1U;
+}
+
 static int is_repository_record(int level, const char *tag,
                                 const char *record_id_start,
                                 const char *record_id_end) {
@@ -116,7 +127,6 @@ static int add_entity_source(SourceList *sources, SourceInput source) {
 }
 
 static int add_citation_source(SourceList *sources, SourceInput citation) {
-    citation.description = citation.reference;
     citation.kind = "citation";
     return source_list_add(sources, &citation);
 }
@@ -337,14 +347,12 @@ int parse_gedcom_with_error(const char *filename, SourceList *sources,
                 }
                 has_active_source = 1;
             } else if (is_citation_source_record(level, tag)) {
-                const char *citation_ref = value;
                 char context_ref[MAX_CONTEXT_LENGTH] = "";
                 char parent_tag[MAX_CONTEXT_LENGTH] = "";
+                const int has_reference = is_gedcom_pointer(value);
 
-                if (*citation_ref != '\0') {
-                    snprintf(reference, sizeof(reference), "%s", citation_ref);
-                } else {
-                    snprintf(reference, sizeof(reference), "%s", "unknown");
+                if (has_reference) {
+                    snprintf(reference, sizeof(reference), "%s", value);
                 }
 
                 if (level == 1) {
@@ -359,7 +367,8 @@ int parse_gedcom_with_error(const char *filename, SourceList *sources,
                                      sizeof(context_ref));
 
                 SourceInput citation = {
-                    .reference = reference,
+                    .description = value,
+                    .reference = has_reference ? reference : NULL,
                     .context = context_ref,
                 };
 

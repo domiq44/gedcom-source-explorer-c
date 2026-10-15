@@ -310,7 +310,8 @@
         details.append(element("summary", "excerpt-summary", countLabel(unmatched.length, "citation", "citations")));
         unmatched.forEach((citation) => {
             const entry = element("article", "related-entry unmatched-entry");
-            entry.append(element("h3", "related-title", citation.reference || "Citation sans référence"));
+            entry.append(element("h3", "related-title",
+                citation.reference || citation.description || "Citation sans référence"));
             entry.append(element("p", "relationship-context", `Contexte : ${citation.context || "inconnu"}`));
             entry.append(excerptBlock("Extrait GEDCOM citation", citation.gedcom));
             details.append(entry);

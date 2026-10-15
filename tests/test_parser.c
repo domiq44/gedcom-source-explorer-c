@@ -13,6 +13,7 @@ typedef struct {
 // --- Fonctions utilitaires de test ---
 
 /* Écrit une fixture et garantit sa fermeture avant le test. */
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 static int write_text_fixture(const char *filename, const char *contents) {
     FILE *file = fopen(filename, "w");
     int write_status;
@@ -131,7 +132,7 @@ static int test_file_not_found(void) {
     const char *filename = "non_existent_file_xyz.ged";
     SourceList sources;
     RepositoryList repositories;
-    GedcomParseError error;
+    GedcomParseError error = {0};
     int parse_result;
     int passed;
 
@@ -283,6 +284,42 @@ static int test_source_entity_and_citation_context(void) {
     return passed;
 }
 
+/* Vérifie qu'une citation textuelle n'est pas interprétée comme référence. */
+static int test_text_citation_is_not_reference(void) {
+    /* Given */
+    const char *expected_description = "Texte libre de la citation";
+    const char *expected_kind = "citation";
+    const char *filename = "tmp_text_citation.ged";
+    static const char fixture[] = "0 @I1@ INDI\n"
+                                  "1 SOUR Texte libre de la citation\n"
+                                  "0 TRLR\n";
+    SourceList sources;
+    RepositoryList repositories;
+    int fixture_written;
+    int parse_result = -1;
+    int passed;
+
+    init_source_list(&sources);
+    init_repository_list(&repositories);
+    fixture_written = write_text_fixture(filename, fixture);
+
+    /* When */
+    if (fixture_written) {
+        parse_result = parse_gedcom(filename, &sources, &repositories);
+    }
+
+    /* Then */
+    passed = fixture_written && parse_result == 0 && sources.count == 1U &&
+             strcmp(sources.sources[0].kind, expected_kind) == 0 &&
+             sources.sources[0].reference == NULL &&
+             strcmp(sources.sources[0].description, expected_description) ==
+                 0;
+    free_source_list(&sources);
+    free_repository_list(&repositories);
+    remove(filename);
+    return passed;
+}
+
 /* Vérifie le contexte direct d'une citation GEDCOM imbriquée. */
 static int test_nested_citation_context(void) {
     /* Given */
@@ -335,7 +372,7 @@ static int test_read_error(void) {
     FILE *directory;
     char probe[2];
     int result;
-    GedcomParseError error;
+    GedcomParseError error = {0};
 
     directory = fopen(".", "r");
     if (directory == NULL) {
@@ -425,7 +462,7 @@ static int test_rejects_overflowing_gedcom_level(void) {
         .invalid_line = "999999999999999999999999999999999999 SOUR @S1@\n"};
     SourceList sources;
     RepositoryList repositories;
-    GedcomParseError error;
+    GedcomParseError error = {0};
     int fixture_written;
     int parse_result = -1;
     int rejected;
@@ -463,7 +500,7 @@ static int test_rejects_excessive_gedcom_level(void) {
         .invalid_line = "100 SOUR @S1@\n"};
     SourceList sources;
     RepositoryList repositories;
-    GedcomParseError error;
+    GedcomParseError error = {0};
     int fixture_written;
     int parse_result = -1;
     int rejected;
@@ -501,7 +538,7 @@ static int test_rejects_malformed_gedcom_level(void) {
         .invalid_line = "1x SOUR @S1@\n"};
     SourceList sources;
     RepositoryList repositories;
-    GedcomParseError error;
+    GedcomParseError error = {0};
     int fixture_written;
     int parse_result = -1;
     int rejected;
@@ -537,7 +574,7 @@ static int test_memory_allocation_error(void) {
     const char *filename = "tmp_memory_failure.ged";
     SourceList sources;
     RepositoryList repositories;
-    GedcomParseError error;
+    GedcomParseError error = {0};
     int fixture_written;
     int parse_result = -1;
     int passed;
@@ -853,6 +890,8 @@ static const TestCase test_cases[] = {
     {"test_false_positive_tag_detection", test_false_positive_tag_detection},
     {"test_source_entity_and_citation_context",
      test_source_entity_and_citation_context},
+    {"test_text_citation_is_not_reference",
+     test_text_citation_is_not_reference},
     {"test_nested_citation_context", test_nested_citation_context},
     {"test_read_error", test_read_error},
     {"test_long_gedcom_line", test_long_gedcom_line},
