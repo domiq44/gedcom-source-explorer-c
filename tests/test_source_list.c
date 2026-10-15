@@ -1,6 +1,6 @@
 #include "source_list.h"
 #include "string_utils.h"
-#include "test_reporter.h"
+#include "test_runner.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -186,30 +186,17 @@ static int test_free_resets_list(void) {
 }
 
 /* Exécute les tests unitaires de SourceList. */
+static const TestCase test_cases[] = {
+    {"test_initial_state", test_initial_state},
+    {"test_rejects_null_list", test_rejects_null_list},
+    {"test_rejects_missing_description", test_rejects_missing_description},
+    {"test_grows_and_stores_values", test_grows_and_stores_values},
+    {"test_cleans_up_after_allocation_failure",
+     test_cleans_up_after_allocation_failure},
+    {"test_free_resets_list", test_free_resets_list},
+};
+
 int main(void) {
-    const int total_tests = 6;
-    int passed_tests = 0;
-    int test_result;
-
-    test_result = test_initial_state();
-    report_test_result("test_initial_state", test_result);
-    passed_tests += test_result;
-    test_result = test_rejects_null_list();
-    report_test_result("test_rejects_null_list", test_result);
-    passed_tests += test_result;
-    test_result = test_rejects_missing_description();
-    report_test_result("test_rejects_missing_description", test_result);
-    passed_tests += test_result;
-    test_result = test_grows_and_stores_values();
-    report_test_result("test_grows_and_stores_values", test_result);
-    passed_tests += test_result;
-    test_result = test_cleans_up_after_allocation_failure();
-    report_test_result("test_cleans_up_after_allocation_failure", test_result);
-    passed_tests += test_result;
-    test_result = test_free_resets_list();
-    report_test_result("test_free_resets_list", test_result);
-    passed_tests += test_result;
-
-    printf("Résultat source_list: %d/%d réussis.\n", passed_tests, total_tests);
-    return passed_tests == total_tests ? 0 : 1;
+    return run_test_suite("source_list", test_cases,
+                          sizeof(test_cases) / sizeof(test_cases[0]));
 }

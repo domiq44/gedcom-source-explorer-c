@@ -1,11 +1,9 @@
 #include "gedcom_parser.h"
 #include "string_utils.h"
-#include "test_reporter.h"
+#include "test_runner.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-typedef enum { TEST_SKIPPED = -1, TEST_FAILED = 0, TEST_PASSED = 1 } TestResult;
 
 typedef struct {
     const char *filename;
@@ -327,7 +325,7 @@ static int test_nested_citation_context(void) {
 }
 
 /* Vérifie qu'une erreur de lecture est distinguée d'une fin de fichier. */
-static TestResult test_read_error(void) {
+static int test_read_error(void) {
     /* Given */
 #if defined(__linux__)
     const GedcomParseErrorCode expected_error_code = GEDCOM_PARSE_ERROR_READ;
@@ -848,94 +846,35 @@ static int test_extracts_repository_excerpt(void) {
 }
 
 /* Exécute l'ensemble des tests unitaires du parseur GEDCOM. */
+static const TestCase test_cases[] = {
+    {"test_embedded_parser_fixture", test_embedded_parser_fixture},
+    {"test_file_not_found", test_file_not_found},
+    {"test_empty_gedcom_file", test_empty_gedcom_file},
+    {"test_false_positive_tag_detection", test_false_positive_tag_detection},
+    {"test_source_entity_and_citation_context",
+     test_source_entity_and_citation_context},
+    {"test_nested_citation_context", test_nested_citation_context},
+    {"test_read_error", test_read_error},
+    {"test_long_gedcom_line", test_long_gedcom_line},
+    {"test_rejects_overflowing_gedcom_level",
+     test_rejects_overflowing_gedcom_level},
+    {"test_rejects_excessive_gedcom_level",
+     test_rejects_excessive_gedcom_level},
+    {"test_rejects_malformed_gedcom_level",
+     test_rejects_malformed_gedcom_level},
+    {"test_memory_allocation_error", test_memory_allocation_error},
+    {"test_empty_filename", test_empty_filename},
+    {"test_orphan_citation", test_orphan_citation},
+    {"test_extracts_repository_links", test_extracts_repository_links},
+    {"test_extracts_source_record_excerpt",
+     test_extracts_source_record_excerpt},
+    {"test_extracts_citation_excerpt", test_extracts_citation_excerpt},
+    {"test_extracts_orphan_citation_excerpt",
+     test_extracts_orphan_citation_excerpt},
+    {"test_extracts_repository_excerpt", test_extracts_repository_excerpt},
+};
+
 int main(void) {
-    int total_passed = 0;
-    int total_tests = 0;
-    TestResult read_error_result;
-    int test_result;
-
-    test_result = test_embedded_parser_fixture();
-    report_test_result("test_embedded_parser_fixture", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_file_not_found();
-    report_test_result("test_file_not_found", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_empty_gedcom_file();
-    report_test_result("test_empty_gedcom_file", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_false_positive_tag_detection();
-    report_test_result("test_false_positive_tag_detection", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_source_entity_and_citation_context();
-    report_test_result("test_source_entity_and_citation_context", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_nested_citation_context();
-    report_test_result("test_nested_citation_context", test_result);
-    total_tests++;
-    total_passed += test_result;
-
-    read_error_result = test_read_error();
-    report_test_result("test_read_error", read_error_result);
-    if (read_error_result != TEST_SKIPPED) {
-        total_tests++;
-        total_passed += read_error_result == TEST_PASSED;
-    }
-
-    test_result = test_long_gedcom_line();
-    report_test_result("test_long_gedcom_line", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_rejects_overflowing_gedcom_level();
-    report_test_result("test_rejects_overflowing_gedcom_level", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_rejects_excessive_gedcom_level();
-    report_test_result("test_rejects_excessive_gedcom_level", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_rejects_malformed_gedcom_level();
-    report_test_result("test_rejects_malformed_gedcom_level", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_memory_allocation_error();
-    report_test_result("test_memory_allocation_error", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_empty_filename();
-    report_test_result("test_empty_filename", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_orphan_citation();
-    report_test_result("test_orphan_citation", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_extracts_repository_links();
-    report_test_result("test_extracts_repository_links", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_extracts_source_record_excerpt();
-    report_test_result("test_extracts_source_record_excerpt", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_extracts_citation_excerpt();
-    report_test_result("test_extracts_citation_excerpt", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_extracts_orphan_citation_excerpt();
-    report_test_result("test_extracts_orphan_citation_excerpt", test_result);
-    total_tests++;
-    total_passed += test_result;
-    test_result = test_extracts_repository_excerpt();
-    report_test_result("test_extracts_repository_excerpt", test_result);
-    total_tests++;
-    total_passed += test_result;
-    printf("Tests terminés. Résultat: %d/%d réussis.\n", total_passed,
-           total_tests);
-
-    return (total_passed == total_tests) ? 0 : 1;
+    return run_test_suite("parser", test_cases,
+                          sizeof(test_cases) / sizeof(test_cases[0]));
 }

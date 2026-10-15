@@ -1,5 +1,5 @@
 #include "repository_list.h"
-#include "test_reporter.h"
+#include "test_runner.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -173,32 +173,18 @@ static int test_free_resets_list(void) {
 }
 
 /* Exécute les tests unitaires de RepositoryList. */
+static const TestCase test_cases[] = {
+    {"test_initial_state", test_initial_state},
+    {"test_add_repository", test_add_repository},
+    {"test_updates_repository_name", test_updates_repository_name},
+    {"test_adds_repository_link", test_adds_repository_link},
+    {"test_rejects_null_reference", test_rejects_null_reference},
+    {"test_rejects_unknown_repository_name",
+     test_rejects_unknown_repository_name},
+    {"test_free_resets_list", test_free_resets_list},
+};
+
 int main(void) {
-    const int total = 7;
-    int passed = 0;
-    int test_result;
-
-    test_result = test_initial_state();
-    report_test_result("test_initial_state", test_result);
-    passed += test_result;
-    test_result = test_add_repository();
-    report_test_result("test_add_repository", test_result);
-    passed += test_result;
-    test_result = test_updates_repository_name();
-    report_test_result("test_updates_repository_name", test_result);
-    passed += test_result;
-    test_result = test_adds_repository_link();
-    report_test_result("test_adds_repository_link", test_result);
-    passed += test_result;
-    test_result = test_rejects_null_reference();
-    report_test_result("test_rejects_null_reference", test_result);
-    passed += test_result;
-    test_result = test_rejects_unknown_repository_name();
-    report_test_result("test_rejects_unknown_repository_name", test_result);
-    passed += test_result;
-    test_result = test_free_resets_list();
-    report_test_result("test_free_resets_list", test_result);
-    passed += test_result;
-
-    return passed == total ? 0 : 1;
+    return run_test_suite("repository_list", test_cases,
+                          sizeof(test_cases) / sizeof(test_cases[0]));
 }

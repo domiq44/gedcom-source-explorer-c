@@ -1,7 +1,6 @@
 #include "string_utils.h"
-#include "test_reporter.h"
+#include "test_runner.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -103,31 +102,17 @@ static int test_strip_utf8_bom_preserves_plain_text(void) {
 }
 
 /* Exécute les tests unitaires des utilitaires de chaînes. */
+static const TestCase test_cases[] = {
+    {"test_string_duplication", test_string_duplication},
+    {"test_trim_whitespace", test_trim_whitespace},
+    {"test_string_assignment", test_string_assignment},
+    {"test_string_assignment_clears_null", test_string_assignment_clears_null},
+    {"test_strip_utf8_bom", test_strip_utf8_bom},
+    {"test_strip_utf8_bom_preserves_plain_text",
+     test_strip_utf8_bom_preserves_plain_text},
+};
+
 int main(void) {
-    const int total_tests = 6;
-    int passed_tests = 0;
-    int test_result;
-
-    test_result = test_string_duplication();
-    report_test_result("test_string_duplication", test_result);
-    passed_tests += test_result;
-    test_result = test_trim_whitespace();
-    report_test_result("test_trim_whitespace", test_result);
-    passed_tests += test_result;
-    test_result = test_string_assignment();
-    report_test_result("test_string_assignment", test_result);
-    passed_tests += test_result;
-    test_result = test_string_assignment_clears_null();
-    report_test_result("test_string_assignment_clears_null", test_result);
-    passed_tests += test_result;
-    test_result = test_strip_utf8_bom();
-    report_test_result("test_strip_utf8_bom", test_result);
-    passed_tests += test_result;
-    test_result = test_strip_utf8_bom_preserves_plain_text();
-    report_test_result("test_strip_utf8_bom_preserves_plain_text", test_result);
-    passed_tests += test_result;
-
-    printf("Résultat string_utils: %d/%d réussis.\n", passed_tests,
-           total_tests);
-    return passed_tests == total_tests ? 0 : 1;
+    return run_test_suite("string_utils", test_cases,
+                          sizeof(test_cases) / sizeof(test_cases[0]));
 }

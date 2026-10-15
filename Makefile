@@ -8,7 +8,8 @@ CFLAGS = -Wall -Wextra -g -Iinclude
 BUILD_DIR = build
 SRC_DIR = src
 TEST_DIR = tests
-TEST_SUPPORT = $(TEST_DIR)/test_reporter.c
+TEST_SUPPORT = $(TEST_DIR)/test_reporter.c $(TEST_DIR)/test_runner.c
+TEST_SUPPORT_HEADERS = $(TEST_DIR)/test_reporter.h $(TEST_DIR)/test_runner.h
 FORMAT_SOURCES = $(wildcard $(SRC_DIR)/*.c $(TEST_DIR)/*.c $(TEST_DIR)/*.h include/*.h)
 ANALYSIS_SOURCES = $(wildcard $(SRC_DIR)/*.c $(TEST_DIR)/*.c)
 WEB_DIR = web
@@ -45,26 +46,26 @@ $(BUILD_DIR):
 $(TARGET): $(APP_SOURCES) $(MAIN_SOURCE) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(APP_SOURCES) $(MAIN_SOURCE) -o $@
 
-$(PARSER_TEST_TARGET): $(TEST_DIR)/test_parser.c $(LIB_SOURCES) $(TEST_SUPPORT) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTRING_UTILS_TESTING $^ -o $@
+$(PARSER_TEST_TARGET): $(TEST_DIR)/test_parser.c $(LIB_SOURCES) $(TEST_SUPPORT) $(TEST_SUPPORT_HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTRING_UTILS_TESTING $(filter %.c,$^) -o $@
 
-$(CONTEXT_TEST_TARGET): $(TEST_DIR)/test_gedcom_context.c $(SRC_DIR)/gedcom_context.c $(TEST_SUPPORT) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $^ -o $@
+$(CONTEXT_TEST_TARGET): $(TEST_DIR)/test_gedcom_context.c $(SRC_DIR)/gedcom_context.c $(TEST_SUPPORT) $(TEST_SUPPORT_HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@
 
-$(SOURCE_LIST_TEST_TARGET): $(TEST_DIR)/test_source_list.c $(SRC_DIR)/source_list.c $(SRC_DIR)/gedcom_excerpt.c $(SRC_DIR)/string_utils.c $(TEST_SUPPORT) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTRING_UTILS_TESTING $^ -o $@
+$(SOURCE_LIST_TEST_TARGET): $(TEST_DIR)/test_source_list.c $(SRC_DIR)/source_list.c $(SRC_DIR)/gedcom_excerpt.c $(SRC_DIR)/string_utils.c $(TEST_SUPPORT) $(TEST_SUPPORT_HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTRING_UTILS_TESTING $(filter %.c,$^) -o $@
 
-$(STRING_UTILS_TEST_TARGET): $(TEST_DIR)/test_string_utils.c $(SRC_DIR)/string_utils.c $(TEST_SUPPORT) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $^ -o $@
+$(STRING_UTILS_TEST_TARGET): $(TEST_DIR)/test_string_utils.c $(SRC_DIR)/string_utils.c $(TEST_SUPPORT) $(TEST_SUPPORT_HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@
 
-$(REPOSITORY_LIST_TEST_TARGET): $(TEST_DIR)/test_repository_list.c $(SRC_DIR)/repository_list.c $(SRC_DIR)/gedcom_excerpt.c $(SRC_DIR)/string_utils.c $(TEST_SUPPORT) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $^ -o $@
+$(REPOSITORY_LIST_TEST_TARGET): $(TEST_DIR)/test_repository_list.c $(SRC_DIR)/repository_list.c $(SRC_DIR)/gedcom_excerpt.c $(SRC_DIR)/string_utils.c $(TEST_SUPPORT) $(TEST_SUPPORT_HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@
 
-$(HTML_REPORT_TEST_TARGET): $(TEST_DIR)/test_html_report.c $(SRC_DIR)/html_report.c $(SRC_DIR)/report_data.c $(SRC_DIR)/source_list.c $(SRC_DIR)/repository_list.c $(SRC_DIR)/gedcom_excerpt.c $(SRC_DIR)/string_utils.c $(WEB_DIR)/report.html $(TEST_SUPPORT) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(TEST_DIR)/test_html_report.c $(SRC_DIR)/html_report.c $(SRC_DIR)/report_data.c $(SRC_DIR)/source_list.c $(SRC_DIR)/repository_list.c $(SRC_DIR)/gedcom_excerpt.c $(SRC_DIR)/string_utils.c $(TEST_SUPPORT) -o $@
+$(HTML_REPORT_TEST_TARGET): $(TEST_DIR)/test_html_report.c $(SRC_DIR)/html_report.c $(SRC_DIR)/report_data.c $(SRC_DIR)/source_list.c $(SRC_DIR)/repository_list.c $(SRC_DIR)/gedcom_excerpt.c $(SRC_DIR)/string_utils.c $(WEB_DIR)/report.html $(TEST_SUPPORT) $(TEST_SUPPORT_HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@
 
-$(SOURCE_ORDER_TEST_TARGET): $(TEST_DIR)/test_source_order.c $(SRC_DIR)/source_order.c $(TEST_SUPPORT) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $^ -o $@
+$(SOURCE_ORDER_TEST_TARGET): $(TEST_DIR)/test_source_order.c $(SRC_DIR)/source_order.c $(TEST_SUPPORT) $(TEST_SUPPORT_HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@
 
 run: $(TARGET)
 	./$(TARGET) "$(GEDCOM)"

@@ -1,7 +1,5 @@
 #include "source_order.h"
-#include "test_reporter.h"
-
-#include <stdio.h>
+#include "test_runner.h"
 
 typedef struct {
     const char *left;
@@ -130,36 +128,18 @@ static int test_case_insensitive_order(void) {
 }
 
 /* Exécute les tests unitaires de comparaison des références GEDCOM. */
+static const TestCase test_cases[] = {
+    {"test_numeric_order", test_numeric_order},
+    {"test_letter_order", test_letter_order},
+    {"test_leading_zero_order", test_leading_zero_order},
+    {"test_large_suffix_order", test_large_suffix_order},
+    {"test_null_order", test_null_order},
+    {"test_missing_suffix_order", test_missing_suffix_order},
+    {"test_malformed_reference_order", test_malformed_reference_order},
+    {"test_case_insensitive_order", test_case_insensitive_order},
+};
+
 int main(void) {
-    const int total = 8;
-    int passed = 0;
-    int test_result;
-
-    test_result = test_numeric_order();
-    report_test_result("test_numeric_order", test_result);
-    passed += test_result;
-    test_result = test_letter_order();
-    report_test_result("test_letter_order", test_result);
-    passed += test_result;
-    test_result = test_leading_zero_order();
-    report_test_result("test_leading_zero_order", test_result);
-    passed += test_result;
-    test_result = test_large_suffix_order();
-    report_test_result("test_large_suffix_order", test_result);
-    passed += test_result;
-    test_result = test_null_order();
-    report_test_result("test_null_order", test_result);
-    passed += test_result;
-    test_result = test_missing_suffix_order();
-    report_test_result("test_missing_suffix_order", test_result);
-    passed += test_result;
-    test_result = test_malformed_reference_order();
-    report_test_result("test_malformed_reference_order", test_result);
-    passed += test_result;
-    test_result = test_case_insensitive_order();
-    report_test_result("test_case_insensitive_order", test_result);
-    passed += test_result;
-
-    printf("Résultat source_order: %d/%d réussis.\n", passed, total);
-    return (passed == total) ? 0 : 1;
+    return run_test_suite("source_order", test_cases,
+                          sizeof(test_cases) / sizeof(test_cases[0]));
 }

@@ -1,5 +1,5 @@
 #include "html_report.h"
-#include "test_reporter.h"
+#include "test_runner.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -454,40 +454,21 @@ static int test_rejects_template_with_duplicate_markers(void) {
 }
 
 /* Exécute les tests unitaires du rapport HTML. */
+static const TestCase test_cases[] = {
+    {"test_rejects_empty_template_path", test_rejects_empty_template_path},
+    {"test_rejects_empty_output_path", test_rejects_empty_output_path},
+    {"test_rejects_null_report_data", test_rejects_null_report_data},
+    {"test_escapes_report_data", test_escapes_report_data},
+    {"test_renders_navigation_controls", test_renders_navigation_controls},
+    {"test_renders_scroll_destinations", test_renders_scroll_destinations},
+    {"test_preserves_control_order", test_preserves_control_order},
+    {"test_rejects_template_without_marker",
+     test_rejects_template_without_marker},
+    {"test_rejects_template_with_duplicate_markers",
+     test_rejects_template_with_duplicate_markers},
+};
+
 int main(void) {
-    const int total_tests = 9;
-    int passed_tests = 0;
-    int test_result;
-
-    test_result = test_rejects_empty_template_path();
-    report_test_result("test_rejects_empty_template_path", test_result);
-    passed_tests += test_result;
-    test_result = test_rejects_empty_output_path();
-    report_test_result("test_rejects_empty_output_path", test_result);
-    passed_tests += test_result;
-    test_result = test_rejects_null_report_data();
-    report_test_result("test_rejects_null_report_data", test_result);
-    passed_tests += test_result;
-    test_result = test_escapes_report_data();
-    report_test_result("test_escapes_report_data", test_result);
-    passed_tests += test_result;
-    test_result = test_renders_navigation_controls();
-    report_test_result("test_renders_navigation_controls", test_result);
-    passed_tests += test_result;
-    test_result = test_renders_scroll_destinations();
-    report_test_result("test_renders_scroll_destinations", test_result);
-    passed_tests += test_result;
-    test_result = test_preserves_control_order();
-    report_test_result("test_preserves_control_order", test_result);
-    passed_tests += test_result;
-    test_result = test_rejects_template_without_marker();
-    report_test_result("test_rejects_template_without_marker", test_result);
-    passed_tests += test_result;
-    test_result = test_rejects_template_with_duplicate_markers();
-    report_test_result("test_rejects_template_with_duplicate_markers",
-                       test_result);
-    passed_tests += test_result;
-
-    printf("Résultat html_report: %d/%d réussis.\n", passed_tests, total_tests);
-    return passed_tests == total_tests ? 0 : 1;
+    return run_test_suite("html_report", test_cases,
+                          sizeof(test_cases) / sizeof(test_cases[0]));
 }

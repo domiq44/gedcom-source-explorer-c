@@ -1,7 +1,6 @@
 #include "gedcom_context.h"
-#include "test_reporter.h"
+#include "test_runner.h"
 
-#include <stdio.h>
 #include <string.h>
 
 /* Helpers de test */
@@ -46,21 +45,14 @@ static int test_context_without_record_identifier(void) {
 }
 
 /* Exécute les tests unitaires de construction du contexte GEDCOM. */
+static const TestCase test_cases[] = {
+    {"test_context_with_parent_tag", test_context_with_parent_tag},
+    {"test_context_without_parent_tag", test_context_without_parent_tag},
+    {"test_context_without_record_identifier",
+     test_context_without_record_identifier},
+};
+
 int main(void) {
-    const int total = 3;
-    int passed = 0;
-    int test_result;
-
-    test_result = test_context_with_parent_tag();
-    report_test_result("test_context_with_parent_tag", test_result);
-    passed += test_result;
-    test_result = test_context_without_parent_tag();
-    report_test_result("test_context_without_parent_tag", test_result);
-    passed += test_result;
-    test_result = test_context_without_record_identifier();
-    report_test_result("test_context_without_record_identifier", test_result);
-    passed += test_result;
-
-    printf("Résultat context: %d/%d réussis.\n", passed, total);
-    return (passed == total) ? 0 : 1;
+    return run_test_suite("gedcom_context", test_cases,
+                          sizeof(test_cases) / sizeof(test_cases[0]));
 }

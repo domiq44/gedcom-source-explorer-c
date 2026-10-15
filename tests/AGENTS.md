@@ -11,4 +11,4 @@
 - Donner aux helpers un nom décrivant leur rôle (`setup_*`, `assert_*`, `capture_*`, etc.). Les garder dans le fichier de test tant qu'ils ne sont utiles qu'à ce fichier; les extraire dans un module partagé seulement lorsqu'ils servent plusieurs suites.
 - Dans `When`, effectuer l'action principale testée, en limitant le bruit de préparation et les actions sans rapport.
 - Dans `Then`, vérifier les résultats observables du comportement. Les échecs doivent fournir un diagnostic utile.
-- Le runner doit identifier chaque test, rapporter son résultat séparément et continuer la suite après un échec.
+- Chaque suite déclare ses cas dans un tableau de tests et délègue leur exécution, leur reporting et le calcul du bilan au runner partagé. Utiliser un statut explicite (`PASS`, `FAIL`, `SKIP`); le runner identifie chaque cas, continue après un échec et calcule les totaux sans compteur manuel dans la suite.
