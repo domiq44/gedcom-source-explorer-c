@@ -88,7 +88,10 @@ Ce projet est utile pour comprendre :
 │   ├── report-mobile.png            # capture mobile (390 x 844)
 │   └── report.js                    # navigation et coloration GEDCOM
 ├── .gitignore
+├── .nvmrc                             # version Node.js recommandée
 ├── Makefile
+├── scripts/
+│   └── setup-browser-tests.sh          # installation des dépendances Playwright
 ├── DIST_README.md                    # guide de la distribution binaire
 ├── package.json                     # dépendance Playwright pour les tests navigateur
 ├── package-lock.json                # versions résolues des dépendances npm
@@ -118,8 +121,10 @@ Les outils suivants ne sont nécessaires que pour les commandes correspondantes 
 
 - **Python 3** : sert le rapport sur une adresse locale pendant les tests
   navigateur.
-- **Node.js 20 ou supérieur et npm** : installent et exécutent Playwright, qui
-  pilote Chromium pour tester les interactions du rapport (`make test-browser`).
+- **Node.js 22 ou supérieur et npm 10 ou supérieur** : installent et exécutent
+  Playwright, qui pilote Chromium pour tester les interactions du rapport
+  (`make test-browser`) uniquement. Node.js 24 LTS est recommandé; `.nvmrc`
+  indique cette version aux gestionnaires compatibles.
 - **clang-format**, **clang-tidy** et **cppcheck** : formatent ou analysent le
   code avec `make format`, `make lint` et `make cppcheck`.
 
@@ -191,13 +196,32 @@ Dans le rapport, les boutons radio « Aucun », « Dépôts associés » et « C
 make test
 ```
 
-Pour installer le navigateur de test et lancer les tests d'interface :
+Les tests C n'ont pas besoin de Node.js ni de npm. Pour préparer les tests
+navigateur sous Fedora (y compris Fedora 44), lance le script suivant :
 
 ```bash
-npm install
-npx playwright install chromium
+bash scripts/setup-browser-tests.sh
+```
+
+Il installe uniquement les dépendances des tests navigateur : Python 3, les
+bibliothèques système de Chromium, Node.js/npm si une version compatible n'est
+pas déjà disponible, puis Playwright et Chromium. Il peut demander le mot de
+passe `sudo` et nécessite une connexion Internet. Les outils C restent à
+installer séparément selon les prérequis généraux. Si Node.js vient d'être
+installé par nvm, recharge-le dans le terminal courant avec la commande affichée
+par le script avant de lancer les tests.
+
+Lancer ensuite les tests d'interface :
+
+```bash
 make test-browser
 ```
+
+Pour une installation manuelle, Node.js inclut npm; installe Node.js 22 ou
+ultérieur et npm 10 ou ultérieur, puis exécute `npm ci` et
+`npx playwright install chromium`. Le script automatise cette préparation sur
+Fedora; il ne modifie pas l'installation Node.js existante si elle respecte les
+versions minimales.
 
 La cible génère un rapport de test isolé dans `build/browser-test/` à partir de
 `gedcom-test.ged`, quelle que soit la valeur `GEDCOM` utilisée pour les autres
@@ -252,7 +276,9 @@ make clean-all
 
 `make clean` supprime les artefacts C et le dossier `build/`. `make clean-browser`
 supprime les dépendances npm et les résultats Playwright. `make clean-all` exécute
-les deux nettoyages; `package-lock.json` est conservé.
+les deux nettoyages; `package-lock.json` est conservé. Ces commandes ne
+désinstallent pas Node.js, npm ou nvm et ne suppriment pas le cache Chromium de
+Playwright, généralement stocké dans `~/.cache/ms-playwright`.
 
 ---
 
